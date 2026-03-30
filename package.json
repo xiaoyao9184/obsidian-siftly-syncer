@@ -1,0 +1,48 @@
+{
+  "name": "siftly-syncer",
+  "version": "0.0.0",
+  "description": "Obsidian plugin to sync bookmarks from Siftly instance.",
+  "keywords": [],
+  "license": "MIT",
+  "author": "xiaoyao9184",
+  "type": "module",
+  "scripts": {
+    "build": "obsidian-dev-utils build",
+    "build:clean": "obsidian-dev-utils build:clean",
+    "build:compile": "obsidian-dev-utils build:compile",
+    "build:compile:svelte": "obsidian-dev-utils build:compile:svelte",
+    "build:compile:typescript": "obsidian-dev-utils build:compile:typescript",
+    "dev": "obsidian-dev-utils dev",
+    "format": "obsidian-dev-utils format",
+    "format:check": "obsidian-dev-utils format:check",
+    "lint": "obsidian-dev-utils lint",
+    "lint:fix": "obsidian-dev-utils lint:fix",
+    "lint:md": "obsidian-dev-utils lint:md",
+    "lint:md:fix": "obsidian-dev-utils lint:md:fix",
+    "spellcheck": "obsidian-dev-utils spellcheck",
+    "version": "obsidian-dev-utils version"
+  },
+  "devDependencies": {
+    "@codemirror/language": "6.11.2",
+    "@codemirror/state": "6.5.0",
+    "@codemirror/view": "6.38.6",
+    "@tsconfig/strictest": "latest",
+    "@types/node": "25.0.3",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "jiti": "latest",
+    "moment": "2.29.4",
+    "obsidian": "latest",
+    "obsidian-dev-utils": "latest",
+    "obsidian-typings": "obsidian-public-latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "svelte": "latest"
+  },
+  "overrides": {
+    "@antfu/utils": "9.2.0",
+    "boolean": "npm:dry-uninstall",
+    "dompurify": "3.0.1",
+    "type-fest": "latest"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "author": "xiaoyao9184",
+  "authorUrl": "https://github.com/xiaoyao9184/",
+  "description": "Obsidian plugin to sync bookmarks from Siftly instance.",
+
+  "id": "siftly-syncer",
+  "isDesktopOnly": false,
+  "name": "Siftly Syncer",
+  "version": "0.0.0"
+}
