@@ -48,6 +48,7 @@ export class PluginSettings {
   public searchSetting = 'defaultSearch';
   public siftlyUrl = 'http://localhost:3000';
   public sliderSetting = 50;
+  public syncAttachmentsFolder = '@Siftly/attachments';
   public syncFolder = '@Siftly';
   public textAreaSetting = 'defaultTextArea';
   public textSetting = 'defaultText';

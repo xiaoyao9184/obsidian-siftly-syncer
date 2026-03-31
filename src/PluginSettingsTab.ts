@@ -59,11 +59,26 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         await this.validator.validate(this.plugin.settings.siftlyUrl);
       });
 
+    // File organization settings
+
+    containerEl.createEl('h3', { text: 'File organization' });
+    containerEl.createEl('div', {
+      cls: 'setting-item-description',
+      text: 'Configure where your bookmarks and assets are stored'
+    });
+
     new SettingEx(this.containerEl)
       .setName('Sync folder')
-      .setDesc('Vault folder path for synced notes (relative path, may include subfolders)')
+      .setDesc('Folder where bookmarks will be saved')
       .addText((text) => {
         this.bind(text, 'syncFolder');
+      });
+
+    new SettingEx(this.containerEl)
+      .setName('Attachments folder')
+      .setDesc('Folder where bookmarks media will be saved')
+      .addText((text) => {
+        this.bind(text, 'syncAttachmentsFolder');
       });
 
     new SettingEx(this.containerEl)
