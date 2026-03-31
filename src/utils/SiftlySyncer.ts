@@ -8,7 +8,8 @@ import {
 
 import type {
   SiftlyBookmarkApiResponse,
-  SiftlyBookmarkItemApiResponse
+  SiftlyBookmarkItemApiResponse,
+  SiftlyMediaItem
 } from '../Models/SiftlyBookmark.ts';
 import type { SiftlyStatsApiResponse } from '../Models/SiftlyStats.ts';
 import type { PluginSettings } from '../PluginSettings.ts';
@@ -35,6 +36,35 @@ export class SiftlySyncer {
     this.settings = settings;
   }
 
+  private static extractFilenameFromContentDisposition(contentDisposition: string | undefined, originalUrl: string, fallbackId: string): string {
+    if (contentDisposition) {
+      const filenameStarMatch = /filename\*\s*=\s*(?:UTF-8''|)(?<value>[^;]+)/iu.exec(contentDisposition);
+      const starValue = filenameStarMatch?.groups?.['value'];
+      if (starValue) {
+        return decodeURIComponent(starValue.trim().replace(/^"|"$/gu, ''));
+      }
+
+      const filenameMatch = /filename\s*=\s*"?[^";]+"?/.exec(contentDisposition);
+      const filenameValue = filenameMatch?.[1];
+      if (filenameValue) {
+        return filenameValue.trim();
+      }
+    }
+
+    try {
+      const url = new URL(originalUrl);
+      const pathname = url.pathname;
+      const candidate = pathname.split('/').filter((part) => part.length > 0).pop();
+      if (candidate) {
+        return candidate;
+      }
+    } catch {
+      // Ignore URL parsing errors and fall back to ID-based filename.
+    }
+
+    return `media-${fallbackId}`;
+  }
+
   public setSyncUiCallback(callback: ((event: SiftlySyncUiEvent) => void) | null): void {
     this.syncUiCallback = callback;
   }
@@ -50,6 +80,7 @@ export class SiftlySyncer {
       const totalPages = Math.ceil(totalBookmarks / pageSize);
 
       await this.ensureFolderExists(this.settings.syncFolder);
+      await this.ensureFolderExists(this.settings.syncAttachmentsFolder);
 
       progressNotice = new Notice(
         formatSiftlySyncProgressLine(0, totalBookmarks),
@@ -94,6 +125,69 @@ export class SiftlySyncer {
       this.notifySyncUi({ kind: 'invalid', message });
       return false;
     }
+  }
+
+  private async downloadMediaForBookmark(bookmark: SiftlyBookmarkItemApiResponse): Promise<SiftlyBookmarkItemApiResponse> {
+    if (bookmark.mediaItems.length === 0) {
+      return bookmark;
+    }
+
+    const normalizedAttachmentsFolder = normalizePath(this.settings.syncAttachmentsFolder.trim());
+    await this.ensureFolderExists(normalizedAttachmentsFolder);
+
+    const updatedMediaItems: SiftlyMediaItem[] = [];
+
+    for (const media of bookmark.mediaItems) {
+      try {
+        const localPath = await this.downloadSingleMedia(media, normalizedAttachmentsFolder);
+        updatedMediaItems.push({
+          ...media,
+          thumbnailUrl: localPath
+        });
+      } catch (error) {
+        console.error('Siftly media download error:', error);
+        updatedMediaItems.push(media);
+      }
+    }
+
+    return {
+      ...bookmark,
+      mediaItems: updatedMediaItems
+    };
+  }
+
+  private async downloadSingleMedia(media: SiftlyMediaItem, attachmentsFolder: string): Promise<string> {
+    const mediaApiUrl = buildSiftlyMediaApiUrl(this.settings.siftlyUrl, media.url);
+    const response = await requestUrl({
+      throw: false,
+      url: mediaApiUrl
+    });
+
+    if (response.status < HTTP_STATUS_SUCCESS_MIN || response.status > HTTP_STATUS_SUCCESS_MAX) {
+      throw new Error(`Media request failed (HTTP ${String(response.status)}).`);
+    }
+
+    let contentDisposition: string | undefined;
+    for (const [key, value] of Object.entries(response.headers)) {
+      if (key.toLowerCase() === 'content-disposition') {
+        contentDisposition = value;
+        break;
+      }
+    }
+
+    const filename = SiftlySyncer.extractFilenameFromContentDisposition(contentDisposition, media.url, media.id);
+    const attachmentPath = normalizePath(`${attachmentsFolder}/${filename}`);
+
+    const data = response.arrayBuffer;
+
+    const existingFile = this.app.vault.getAbstractFileByPath(attachmentPath);
+    if (existingFile instanceof TFile) {
+      await this.app.vault.modifyBinary(existingFile, data);
+    } else {
+      await this.app.vault.createBinary(attachmentPath, data);
+    }
+
+    return attachmentPath;
   }
 
   private async ensureFolderExists(folderPath: string): Promise<void> {
@@ -171,7 +265,8 @@ export class SiftlySyncer {
   private async writeBookmarkNote(bookmark: SiftlyBookmarkItemApiResponse): Promise<void> {
     const normalizedFolder = normalizePath(this.settings.syncFolder.trim());
     const notePath = normalizePath(`${normalizedFolder}/${bookmark.tweetId}.md`);
-    const noteContent = renderBookmarkNote(bookmark);
+    const bookmarkWithMedia = await this.downloadMediaForBookmark(bookmark);
+    const noteContent = renderBookmarkNote(bookmarkWithMedia);
     const existingFile = this.app.vault.getAbstractFileByPath(notePath);
 
     if (existingFile instanceof TFile) {
@@ -187,6 +282,13 @@ export function buildSiftlyBookmarksApiUrl(baseUrl: string, page: number, limit:
   const url = new URL(`${normalizeSiftlyBaseUrl(baseUrl)}/api/bookmarks`);
   url.searchParams.set('page', String(page));
   url.searchParams.set('limit', String(limit));
+  return url.toString();
+}
+
+export function buildSiftlyMediaApiUrl(baseUrl: string, mediaUrl: string): string {
+  const url = new URL(`${normalizeSiftlyBaseUrl(baseUrl)}/api/media`);
+  url.searchParams.set('url', mediaUrl);
+  url.searchParams.set('download', '1');
   return url.toString();
 }
 
@@ -222,10 +324,12 @@ function isBookmarkApiResponse(data: unknown): data is SiftlyBookmarkApiResponse
 }
 
 function renderBookmarkNote(bookmark: SiftlyBookmarkItemApiResponse): string {
-  const tags = bookmark.categories.map((category) => category.slug);
-  const categoryNames = bookmark.categories.map((category) => category.name).join(', ');
   const sourceUrl = `https://x.com/${bookmark.authorHandle}/status/${bookmark.tweetId}`;
-  const mediaLinks = bookmark.mediaItems.map((media) => `- ${media.url}`).join('\n');
+  const tags = bookmark.categories.map((category) => category.slug);
+  const categoryNames = bookmark.categories.map((category) => category.name);
+  const mediaLinks = bookmark.mediaItems
+    .map((media) => `[![](${media.thumbnailUrl})](${media.url})`)
+    .join('\n');
 
   return `---
 siftlyId: "${bookmark.id}"
@@ -235,19 +339,13 @@ authorHandle: "${bookmark.authorHandle}"
 tweetCreatedAt: "${bookmark.tweetCreatedAt}"
 importedAt: "${bookmark.importedAt}"
 sourceUrl: "${sourceUrl}"
-categories: [${tags.map((tag) => `"${tag}"`).join(', ')}]
+categories: [${categoryNames.map((name) => `"${name}"`).join(', ')}]
+tags: [${tags.map((tag) => `"${tag}"`).join(', ')}]
 ---
 
-# ${bookmark.authorName}
+${mediaLinks || '(none)'}
 
 ${bookmark.text}
 
-## Categories
-
-${categoryNames || '(none)'}
-
-## Media
-
-${mediaLinks || '(none)'}
 `;
 }
