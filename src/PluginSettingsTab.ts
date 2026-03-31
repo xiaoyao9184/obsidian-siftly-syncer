@@ -113,7 +113,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           .onClick(async () => {
             if (this.validatorResult) {
               const syncResult = await this.plugin.siftlySyncer.sync(this.plugin.settings.syncIncremental);
-              if (syncResult.latestImportedAt !== null) {
+              if (syncResult.syncedCount > 0 && syncResult.latestImportedAt !== null) {
                 const syncedLastTime = syncResult.latestImportedAt;
                 await this.plugin.settingsManager.editAndSave((settings) => {
                   settings.syncedLastTime = syncedLastTime;
@@ -135,7 +135,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           this.applySiftlySyncUiToSyncStats(event);
         });
         const syncedLastTime = this.plugin.settings.syncedLastTime;
-        if (syncedLastTime === null) {
+        if (syncedLastTime.getTime() <= 0) {
           this.applySiftlySyncUiToSyncStats({
             kind: 'clear',
             message: 'Synced: NEVER'

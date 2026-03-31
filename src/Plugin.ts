@@ -89,8 +89,19 @@ export class Plugin extends PluginBase<PluginTypes> {
       id: 'sample-with-check',
       name: 'Sample with check'
     });
+    this.addCommand({
+      callback: convertAsyncToSync(() => this.runSiftlySyncRibbonIconCommand(true)),
+      id: 'sync-siftly-incremental',
+      name: 'Sync Siftly (incremental)'
+    });
+    this.addCommand({
+      callback: convertAsyncToSync(() => this.runSiftlySyncRibbonIconCommand(false)),
+      id: 'sync-siftly-full',
+      name: 'Sync Siftly (full)'
+    });
 
     this.addRibbonIcon('dice', 'Sample ribbon icon', this.runSampleRibbonIconCommand.bind(this));
+    this.addRibbonIcon('refresh-cw', 'Sync Siftly bookmarks', convertAsyncToSync(() => this.runSiftlySyncRibbonIconCommand()));
 
     this.addStatusBarItem().setText('Sample status bar item');
 
@@ -244,6 +255,19 @@ export class Plugin extends PluginBase<PluginTypes> {
 
   private runSampleRibbonIconCommand(): void {
     new Notice('Sample ribbon icon command');
+  }
+
+  private async runSiftlySyncRibbonIconCommand(
+    syncIncremental: boolean = this.settingsManager.settingsWrapper.settings.syncIncremental
+  ): Promise<void> {
+    const syncResult = await this.siftlySyncer.sync(syncIncremental);
+
+    if (syncResult.syncedCount > 0 && syncResult.latestImportedAt !== null) {
+      const syncedLastTime = syncResult.latestImportedAt;
+      await this.settingsManager.editAndSave((settings) => {
+        settings.syncedLastTime = syncedLastTime;
+      });
+    }
   }
 
   private async showAlert(): Promise<void> {
