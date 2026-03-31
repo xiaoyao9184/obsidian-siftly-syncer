@@ -9,10 +9,14 @@ import type { PluginTypes } from './PluginTypes.ts';
 
 import { TypedItem } from './PluginSettings.ts';
 import { SiftlyStatsValidator } from './utils/SiftlyStatsValidator.ts';
+import { SiftlySyncer } from './utils/SiftlySyncer.ts';
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   private siftlyStats: HTMLElement | null = null;
+  private syncer: null | SiftlySyncer = null;
+  private syncStats: HTMLElement | null = null;
   private validator: null | SiftlyStatsValidator = null;
+  private validatorResult: boolean | undefined = undefined;
 
   public override display(): void {
     super.display();
@@ -47,7 +51,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           .setCta()
           .onClick(async () => {
             if (currentUrlValue) {
-              await this.validator?.validate(currentUrlValue);
+              this.validatorResult = await this.validator?.validate(currentUrlValue);
             }
           });
       })
@@ -56,7 +60,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         this.validator = new SiftlyStatsValidator(this.siftlyStats);
 
         // Validate the current URL on load.
-        await this.validator.validate(this.plugin.settings.siftlyUrl);
+        this.validatorResult = await this.validator.validate(this.plugin.settings.siftlyUrl);
       });
 
     // File organization settings
@@ -79,6 +83,33 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       .setDesc('Folder where bookmarks media will be saved')
       .addText((text) => {
         this.bind(text, 'syncAttachmentsFolder');
+      });
+
+    // Sync behavior settings
+
+    containerEl.createEl('h3', { text: 'Sync behavior' });
+    containerEl.createEl('div', {
+      cls: 'setting-item-description',
+      text: 'Control how synchronization works'
+    });
+
+    new SettingEx(containerEl)
+      .setName('Manual sync')
+      .setDesc('Sync bookmarks now')
+      .addButton((button) => {
+        button.setButtonText('Sync now')
+          .onClick(async () => {
+            if (this.validatorResult) {
+              await this.syncer?.sync();
+            } else {
+              new Notice('Please validate the Siftly URL first.');
+            }
+          });
+      })
+      .then(async () => {
+        this.syncStats = this.createSyncStatsElement(this.containerEl);
+        const { settings } = this.plugin.settingsManager.settingsWrapper;
+        this.syncer = new SiftlySyncer(this.app, settings, this.syncStats);
       });
 
     new SettingEx(this.containerEl)
@@ -347,5 +378,12 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
     siftlyStats.createDiv({ cls: 'siftly-stats-status' });
     siftlyStats.createDiv({ cls: 'siftly-stats-details' });
     return siftlyStats;
+  }
+
+  private createSyncStatsElement(containerEl: HTMLElement): HTMLElement {
+    const syncStats = containerEl.createDiv({ cls: 'sync-stats-info' });
+    syncStats.createDiv({ cls: 'sync-stats-status' });
+    syncStats.createDiv({ cls: 'sync-stats-details' });
+    return syncStats;
   }
 }

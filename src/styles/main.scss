@@ -8,7 +8,8 @@
   /* Override library styles */
 }
 
-.siftly-stats-info {
+.siftly-stats-info,
+.sync-stats-info {
   margin-top: 8px;
   font-size: 0.8em;
   padding: 8px;
@@ -19,19 +20,25 @@
 
 /* Siftly status indicators */
 .siftly-stats-info.valid,
-.siftly-stats-status.valid {
+.siftly-stats-status.valid,
+.sync-stats-info.valid,
+.sync-stats-status.valid {
   color: var(--color-green);
 }
 
 .siftly-stats-info.invalid,
-.siftly-stats-status.invalid {
+.siftly-stats-status.invalid,
+.sync-stats-info.invalid,
+.sync-stats-status.invalid {
   color: var(--color-red);
 }
 
-.siftly-stats-info.valid {
+.siftly-stats-info.valid,
+.sync-stats-info.valid {
   border-left: 3px solid var(--color-green);
 }
 
-.siftly-stats-info.invalid {
+.siftly-stats-info.invalid,
+.sync-stats-info.invalid {
   border-left: 3px solid var(--color-red);
 }
