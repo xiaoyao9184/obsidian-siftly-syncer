@@ -42,3 +42,15 @@
 .sync-stats-info.invalid {
   border-left: 3px solid var(--color-red);
 }
+
+.siftly-stats-info.progress,
+.siftly-stats-status.progress,
+.sync-stats-info.progress,
+.sync-stats-status.progress {
+  color: var(--color-blue);
+}
+
+.siftly-stats-info.progress,
+.sync-stats-info.progress {
+  border-left: 3px solid var(--color-blue);
+}
