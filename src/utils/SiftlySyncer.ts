@@ -14,6 +14,8 @@ import type {
 import type { SiftlyStatsApiResponse } from '../Models/SiftlyStats.ts';
 import type { PluginSettings } from '../PluginSettings.ts';
 
+import { SiftlyFilenamer } from './SiftlyFilenamer.ts';
+
 const HTTP_STATUS_SUCCESS_MAX = 299;
 const HTTP_STATUS_SUCCESS_MIN = 200;
 const DEFAULT_PAGE_SIZE = 100;
@@ -264,7 +266,11 @@ export class SiftlySyncer {
 
   private async writeBookmarkNote(bookmark: SiftlyBookmarkItemApiResponse): Promise<void> {
     const normalizedFolder = normalizePath(this.settings.syncFolder.trim());
-    const notePath = normalizePath(`${normalizedFolder}/${bookmark.tweetId}.md`);
+    const notePath = SiftlyFilenamer.buildBookmarkNotePath(normalizedFolder, bookmark.tweetCreatedAt, bookmark.text);
+    const noteFolder = notePath.split('/').slice(0, -1).join('/');
+    if (noteFolder.length > 0) {
+      await this.ensureFolderExists(noteFolder);
+    }
     const bookmarkWithMedia = await this.downloadMediaForBookmark(bookmark);
     const noteContent = renderBookmarkNote(bookmarkWithMedia);
     const existingFile = this.app.vault.getAbstractFileByPath(notePath);
@@ -343,7 +349,7 @@ categories: [${categoryNames.map((name) => `"${name}"`).join(', ')}]
 tags: [${tags.map((tag) => `"${tag}"`).join(', ')}]
 ---
 
-${mediaLinks || '(none)'}
+${mediaLinks || ''}
 
 ${bookmark.text}
 
