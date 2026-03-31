@@ -112,7 +112,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         button.setButtonText('Sync now')
           .onClick(async () => {
             if (this.validatorResult) {
-              const syncResult = await this.plugin.siftlySyncer.sync();
+              const syncResult = await this.plugin.siftlySyncer.sync(this.plugin.settings.syncIncremental);
               if (syncResult.latestImportedAt !== null) {
                 const syncedLastTime = syncResult.latestImportedAt;
                 await this.plugin.settingsManager.editAndSave((settings) => {

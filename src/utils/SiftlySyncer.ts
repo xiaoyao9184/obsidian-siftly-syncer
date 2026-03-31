@@ -20,6 +20,7 @@ import { SiftlyFilerender } from './SiftlyFilerender.ts';
 const HTTP_STATUS_SUCCESS_MAX = 299;
 const HTTP_STATUS_SUCCESS_MIN = 200;
 const DEFAULT_PAGE_SIZE = 100;
+const BINARY_SEARCH_DIVISOR = 2;
 const SYNC_SUCCESS_NOTICE_HIDE_MS = 4000;
 const SYNC_ERROR_NOTICE_HIDE_MS = 8000;
 
@@ -78,7 +79,7 @@ export class SiftlySyncer {
     this.syncUiCallback = callback;
   }
 
-  public async sync(): Promise<SiftlySyncResult> {
+  public async sync(syncIncremental: boolean = this.settings.syncIncremental): Promise<SiftlySyncResult> {
     this.notifySyncUi({ kind: 'clear', message: 'Syncing: STARTED' });
 
     let progressNotice: Notice | undefined;
@@ -87,7 +88,8 @@ export class SiftlySyncer {
     let syncedCount = 0;
 
     try {
-      const totalBookmarks = await this.fetchTotalBookmarks();
+      const totalBookmarksFromStats = await this.fetchTotalBookmarks();
+      const totalBookmarks = await this.resolveTotalBookmarksForSync(totalBookmarksFromStats, syncIncremental);
       const pageSize = DEFAULT_PAGE_SIZE;
       const totalPages = Math.ceil(totalBookmarks / pageSize);
 
@@ -239,6 +241,25 @@ export class SiftlySyncer {
     }
   }
 
+  private async fetchBookmarkImportedAtTimestampByOrder(order: number): Promise<null | number> {
+    if (order < 1) {
+      return null;
+    }
+
+    const pageData = await this.fetchBookmarksPage(order, 1);
+    const bookmark = pageData.bookmarks[0];
+    if (bookmark === undefined) {
+      return null;
+    }
+
+    const importedAtTimestamp = Date.parse(bookmark.importedAt);
+    if (!Number.isFinite(importedAtTimestamp)) {
+      return null;
+    }
+
+    return importedAtTimestamp;
+  }
+
   private async fetchBookmarksPage(page: number, limit: number): Promise<SiftlyBookmarkApiResponse> {
     const bookmarksUrl = buildSiftlyBookmarksApiUrl(this.settings.siftlyUrl, page, limit);
     const response = await requestUrl({
@@ -279,6 +300,34 @@ export class SiftlySyncer {
 
   private notifySyncUi(event: SiftlySyncUiEvent): void {
     this.syncUiCallback?.(event);
+  }
+
+  private async resolveTotalBookmarksForSync(totalBookmarks: number, syncIncremental: boolean): Promise<number> {
+    if (!syncIncremental) {
+      return totalBookmarks;
+    }
+
+    const syncedLastTime = this.settings.syncedLastTime;
+
+    const syncedLastTimestamp = syncedLastTime.getTime();
+    let left = 1;
+    let right = totalBookmarks;
+    let lastNeedSyncOrder = 0;
+
+    while (left <= right) {
+      const middle = Math.floor((left + right) / BINARY_SEARCH_DIVISOR);
+      const importedAtTimestamp = await this.fetchBookmarkImportedAtTimestampByOrder(middle);
+      const needSync = importedAtTimestamp !== null && importedAtTimestamp > syncedLastTimestamp;
+
+      if (needSync) {
+        lastNeedSyncOrder = middle;
+        left = middle + 1;
+      } else {
+        right = middle - 1;
+      }
+    }
+
+    return lastNeedSyncOrder;
   }
 
   private async writeBookmarkNote(bookmark: SiftlyBookmarkItemApiResponse): Promise<void> {
