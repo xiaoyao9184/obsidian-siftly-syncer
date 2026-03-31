@@ -12,6 +12,20 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
     this.containerEl.empty();
 
     new SettingEx(this.containerEl)
+      .setName('Siftly server base URL')
+      .setDesc('Root URL of your Siftly server, e.g. http://localhost:3000')
+      .addUrl((url) => {
+        this.bind(url, 'siftlyUrl');
+      });
+
+    new SettingEx(this.containerEl)
+      .setName('Sync folder')
+      .setDesc('Vault folder path for synced notes (relative path, may include subfolders)')
+      .addText((text) => {
+        this.bind(text, 'syncFolder');
+      });
+
+    new SettingEx(this.containerEl)
       .setName('Button setting name')
       .setDesc('Button setting description.')
       .addButton((button) => {
