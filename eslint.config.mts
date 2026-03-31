@@ -9,7 +9,7 @@ const configs: Linter.Config[] = [
       'obsidianmd/ui/sentence-case': [
         'error',
         {
-          brands: ['React', 'Svelte']
+          brands: ['React', 'Siftly', 'Svelte']
         }
       ]
     }

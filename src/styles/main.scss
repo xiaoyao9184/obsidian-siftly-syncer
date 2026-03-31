@@ -7,3 +7,18 @@
 .siftly-syncer.obsidian-dev-utils {
   /* Override library styles */
 }
+
+.siftly-stats-validator-status {
+  margin-top: 0.35em;
+  margin-bottom: 0.75em;
+  min-height: 1.2em;
+  font-size: var(--font-ui-smaller);
+
+  &.valid {
+    color: var(--text-success);
+  }
+
+  &.invalid {
+    color: var(--text-error);
+  }
+}

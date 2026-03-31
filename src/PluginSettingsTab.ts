@@ -5,6 +5,7 @@ import { SettingEx } from 'obsidian-dev-utils/obsidian/SettingEx';
 import type { PluginTypes } from './PluginTypes.ts';
 
 import { TypedItem } from './PluginSettings.ts';
+import { SiftlyStatsValidator } from './utils/SiftlyStatsValidator.ts';
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   public override display(): void {
@@ -16,7 +17,19 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       .setDesc('Root URL of your Siftly server, e.g. http://localhost:3000')
       .addUrl((url) => {
         this.bind(url, 'siftlyUrl');
+      })
+      .addExtraButton((extraButton) => {
+        extraButton
+          .setIcon('wifi')
+          .setTooltip('Test the Siftly stats endpoint from this URL')
+          .onClick(() => {
+            this.verifySiftlyStatsConnection(siftlyStatsStatusEl).catch((error: unknown) => {
+              console.error(error);
+            });
+          });
       });
+
+    const siftlyStatsStatusEl = this.containerEl.createDiv({ cls: 'siftly-stats-validator-status' });
 
     new SettingEx(this.containerEl)
       .setName('Sync folder')
@@ -284,5 +297,10 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         })
           .setPlaceholder('Enter a value');
       });
+  }
+
+  private async verifySiftlyStatsConnection(statusEl: HTMLElement): Promise<void> {
+    const validator = new SiftlyStatsValidator(statusEl);
+    await validator.validate(this.plugin.settings.siftlyUrl);
   }
 }
