@@ -46,7 +46,9 @@ export class PluginSettings {
   public numberSetting = 123;
   public progressBarSetting = 50;
   public searchSetting = 'defaultSearch';
+  public siftlyUrl = 'http://localhost:3000';
   public sliderSetting = 50;
+  public syncFolder = '@Siftly';
   public textAreaSetting = 'defaultTextArea';
   public textSetting = 'defaultText';
   public timeSetting: moment.Duration = moment.duration({ hours: 12, minutes: 34 });
