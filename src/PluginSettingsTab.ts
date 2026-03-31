@@ -118,7 +118,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
                 await this.plugin.settingsManager.editAndSave((settings) => {
                   settings.syncedLastTime = syncedLastTime;
                 });
-                this.applySiftlySyncUiToSyncStats({
+                this.updateSyncStats({
                   kind: 'success',
                   latestImportedAt: syncedLastTime,
                   syncedCount: syncResult.syncedCount
@@ -132,16 +132,16 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       .then(async () => {
         this.syncStats = this.createSyncStatsElement(this.containerEl);
         this.plugin.siftlySyncer.setProgressMonitor('setting-tab', (event) => {
-          this.applySiftlySyncUiToSyncStats(event);
+          this.updateSyncStats(event);
         });
         const syncedLastTime = this.plugin.settings.syncedLastTime;
         if (syncedLastTime.getTime() <= 0) {
-          this.applySiftlySyncUiToSyncStats({
-            kind: 'clear',
-            message: 'Synced: NEVER'
+          this.updateSyncStats({
+            kind: 'never',
+            message: 'Please synchronize first.'
           });
         } else {
-          this.applySiftlySyncUiToSyncStats({
+          this.updateSyncStats({
             kind: 'last',
             latestImportedAt: syncedLastTime
           });
@@ -409,20 +409,26 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       });
   }
 
-  private applySiftlySyncUiToSyncStats(event: SiftlySyncProgressEvent): void {
+  private createSiftlyStatsElement(containerEl: HTMLElement): HTMLElement {
+    const siftlyStats = containerEl.createDiv({ cls: 'siftly-stats-info' });
+    siftlyStats.createDiv({ cls: 'siftly-stats-status' });
+    siftlyStats.createDiv({ cls: 'siftly-stats-details' });
+    return siftlyStats;
+  }
+
+  private createSyncStatsElement(containerEl: HTMLElement): HTMLElement {
+    const syncStats = containerEl.createDiv({ cls: 'sync-stats-info' });
+    syncStats.createDiv({ cls: 'sync-stats-status' });
+    syncStats.createDiv({ cls: 'sync-stats-details' });
+    return syncStats;
+  }
+
+  private updateSyncStats(event: SiftlySyncProgressEvent): void {
     const el = this.syncStats;
     if (el === null) {
       return;
     }
     switch (event.kind) {
-      case 'clear': {
-        el.removeClass(SYNC_STATS_CLASS_INVALID);
-        el.removeClass(SYNC_STATS_CLASS_LAST);
-        el.removeClass(SYNC_STATS_CLASS_PROGRESS);
-        el.removeClass(SYNC_STATS_CLASS_VALID);
-        el.setText(event.message);
-        return;
-      }
       case 'invalid': {
         el.removeClass(SYNC_STATS_CLASS_LAST);
         el.removeClass(SYNC_STATS_CLASS_VALID);
@@ -440,6 +446,16 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         el.addClass(SYNC_STATS_CLASS_LAST);
         el.setText(
           `Synced: last @ ${event.latestImportedAt.toLocaleString()}`
+        );
+        return;
+      }
+      case 'never': {
+        el.removeClass(SYNC_STATS_CLASS_INVALID);
+        el.removeClass(SYNC_STATS_CLASS_LAST);
+        el.removeClass(SYNC_STATS_CLASS_PROGRESS);
+        el.removeClass(SYNC_STATS_CLASS_VALID);
+        el.setText(
+          `Never: ${event.message}`
         );
         return;
       }
@@ -467,19 +483,5 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         break;
       }
     }
-  }
-
-  private createSiftlyStatsElement(containerEl: HTMLElement): HTMLElement {
-    const siftlyStats = containerEl.createDiv({ cls: 'siftly-stats-info' });
-    siftlyStats.createDiv({ cls: 'siftly-stats-status' });
-    siftlyStats.createDiv({ cls: 'siftly-stats-details' });
-    return siftlyStats;
-  }
-
-  private createSyncStatsElement(containerEl: HTMLElement): HTMLElement {
-    const syncStats = containerEl.createDiv({ cls: 'sync-stats-info' });
-    syncStats.createDiv({ cls: 'sync-stats-status' });
-    syncStats.createDiv({ cls: 'sync-stats-details' });
-    return syncStats;
   }
 }

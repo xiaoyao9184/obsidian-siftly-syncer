@@ -89,9 +89,6 @@ export class Plugin extends PluginBase<PluginTypes> {
     this.siftlySyncerInstance = new SiftlySyncer(this.app, settings);
     this.siftlySyncer.setProgressMonitor('notice', (event) => {
       switch (event.kind) {
-        case 'clear':
-          this.syncProgressNotice?.hide();
-          break;
         case 'invalid': {
           const message = event.message;
           if (this.syncProgressNotice === null) {
@@ -106,6 +103,9 @@ export class Plugin extends PluginBase<PluginTypes> {
           break;
         }
         case 'last':
+          break;
+        case 'never':
+          this.syncProgressNotice?.hide();
           break;
         case 'progress':
           break;
@@ -167,10 +167,6 @@ export class Plugin extends PluginBase<PluginTypes> {
         return;
       }
       switch (event.kind) {
-        case 'clear':
-          this.statusBarItemEl.removeClass('siftly-status-spinning');
-          this.statusBarItemEl.setAttribute('title', `Siftly - ${event.message || 'idle'}`);
-          break;
         case 'invalid':
           this.statusBarItemEl.removeClass('siftly-status-spinning');
           this.statusBarItemEl.setAttribute('title', `Siftly - ${event.message}`);
@@ -181,6 +177,10 @@ export class Plugin extends PluginBase<PluginTypes> {
           this.statusBarItemEl.setAttribute('title', `Siftly - last synced at ${formatted}`);
           break;
         }
+        case 'never':
+          this.statusBarItemEl.removeClass('siftly-status-spinning');
+          this.statusBarItemEl.setAttribute('title', `Siftly - ${event.message || 'idle'}`);
+          break;
         case 'progress':
           this.statusBarItemEl.addClass('siftly-status-spinning');
           this.statusBarItemEl.setAttribute(
