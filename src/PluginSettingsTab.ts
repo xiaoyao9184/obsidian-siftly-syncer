@@ -98,6 +98,13 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       text: 'Control how synchronization works'
     });
 
+    new SettingEx(this.containerEl)
+      .setName('Incremental sync')
+      .setDesc('Only sync new bookmarks since last successful sync')
+      .addCheckbox((checkbox) => {
+        this.bind(checkbox, 'syncIncremental');
+      });
+
     new SettingEx(containerEl)
       .setName('Manual sync')
       .setDesc('Sync bookmarks now')

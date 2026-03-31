@@ -51,6 +51,7 @@ export class PluginSettings {
   public syncAttachmentsFolder = '@Siftly/attachments';
   public syncedLastTime: Date | null = null;
   public syncFolder = '@Siftly';
+  public syncIncremental = true;
   public textAreaSetting = 'defaultTextArea';
   public textSetting = 'defaultText';
   public timeSetting: moment.Duration = moment.duration({ hours: 12, minutes: 34 });
