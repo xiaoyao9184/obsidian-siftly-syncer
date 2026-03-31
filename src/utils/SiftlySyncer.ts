@@ -15,6 +15,7 @@ import type { SiftlyStatsApiResponse } from '../Models/SiftlyStats.ts';
 import type { PluginSettings } from '../PluginSettings.ts';
 
 import { SiftlyFilenamer } from './SiftlyFilenamer.ts';
+import { SiftlyFilerender } from './SiftlyFilerender.ts';
 
 const HTTP_STATUS_SUCCESS_MAX = 299;
 const HTTP_STATUS_SUCCESS_MIN = 200;
@@ -272,7 +273,7 @@ export class SiftlySyncer {
       await this.ensureFolderExists(noteFolder);
     }
     const bookmarkWithMedia = await this.downloadMediaForBookmark(bookmark);
-    const noteContent = renderBookmarkNote(bookmarkWithMedia);
+    const noteContent = SiftlyFilerender.renderBookmarkNote(bookmarkWithMedia);
     const existingFile = this.app.vault.getAbstractFileByPath(notePath);
 
     if (existingFile instanceof TFile) {
@@ -327,31 +328,4 @@ function isBookmarkApiResponse(data: unknown): data is SiftlyBookmarkApiResponse
 
   const record = data as Record<string, unknown>;
   return Array.isArray(record['bookmarks']);
-}
-
-function renderBookmarkNote(bookmark: SiftlyBookmarkItemApiResponse): string {
-  const sourceUrl = `https://x.com/${bookmark.authorHandle}/status/${bookmark.tweetId}`;
-  const tags = bookmark.categories.map((category) => category.slug);
-  const categoryNames = bookmark.categories.map((category) => category.name);
-  const mediaLinks = bookmark.mediaItems
-    .map((media) => `[![](${media.thumbnailUrl})](${media.url})`)
-    .join('\n');
-
-  return `---
-siftlyId: "${bookmark.id}"
-tweetId: "${bookmark.tweetId}"
-author: "${bookmark.authorName}"
-authorHandle: "${bookmark.authorHandle}"
-tweetCreatedAt: "${bookmark.tweetCreatedAt}"
-importedAt: "${bookmark.importedAt}"
-sourceUrl: "${sourceUrl}"
-categories: [${categoryNames.map((name) => `"${name}"`).join(', ')}]
-tags: [${tags.map((tag) => `"${tag}"`).join(', ')}]
----
-
-${mediaLinks || ''}
-
-${bookmark.text}
-
-`;
 }
