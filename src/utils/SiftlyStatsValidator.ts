@@ -12,6 +12,12 @@ export class SiftlyStatsValidator {
     this.statusEl = statusEl ?? null;
   }
 
+  public clearStatus(): void {
+    this.statusEl?.empty();
+    this.statusEl?.removeClass('invalid');
+    this.statusEl?.removeClass('valid');
+  }
+
   public async validate(siftlyUrl: string): Promise<boolean> {
     this.clearStatus();
 
@@ -46,12 +52,6 @@ export class SiftlyStatsValidator {
       this.showInvalid('Failed to reach the Siftly stats API.');
       return false;
     }
-  }
-
-  private clearStatus(): void {
-    this.statusEl?.empty();
-    this.statusEl?.removeClass('invalid');
-    this.statusEl?.removeClass('valid');
   }
 
   private showInvalid(message: string): void {

@@ -8,17 +8,30 @@
   /* Override library styles */
 }
 
-.siftly-stats-validator-status {
-  margin-top: 0.35em;
-  margin-bottom: 0.75em;
-  min-height: 1.2em;
-  font-size: var(--font-ui-smaller);
+.siftly-stats-info {
+  margin-top: 8px;
+  font-size: 0.8em;
+  padding: 8px;
+  border-radius: 4px;
+  background-color: var(--background-secondary);
+}
 
-  &.valid {
-    color: var(--text-success);
-  }
 
-  &.invalid {
-    color: var(--text-error);
-  }
+/* Siftly status indicators */
+.siftly-stats-info.valid,
+.siftly-stats-status.valid {
+  color: var(--color-green);
+}
+
+.siftly-stats-info.invalid,
+.siftly-stats-status.invalid {
+  color: var(--color-red);
+}
+
+.siftly-stats-info.valid {
+  border-left: 3px solid var(--color-green);
+}
+
+.siftly-stats-info.invalid {
+  border-left: 3px solid var(--color-red);
 }

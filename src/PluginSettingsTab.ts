@@ -1,4 +1,7 @@
-import { Notice } from 'obsidian';
+import {
+  ButtonComponent,
+  Notice
+} from 'obsidian';
 import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginSettingsTabBase';
 import { SettingEx } from 'obsidian-dev-utils/obsidian/SettingEx';
 
@@ -8,28 +11,53 @@ import { TypedItem } from './PluginSettings.ts';
 import { SiftlyStatsValidator } from './utils/SiftlyStatsValidator.ts';
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
+  private siftlyStats: HTMLElement | null = null;
+  private validator: null | SiftlyStatsValidator = null;
+
   public override display(): void {
     super.display();
-    this.containerEl.empty();
+    const { containerEl } = this;
+    containerEl.empty();
 
-    new SettingEx(this.containerEl)
-      .setName('Siftly server base URL')
+    // API configuration settings
+
+    containerEl.createEl('h3', { text: 'API configuration' });
+    containerEl.createEl('div', {
+      cls: 'setting-item-description',
+      text: 'Connection settings for your Siftly instance'
+    });
+
+    let currentUrlValue = '';
+    new SettingEx(containerEl)
+      .setName('Base URL')
       .setDesc('Root URL of your Siftly server, e.g. http://localhost:3000')
       .addUrl((url) => {
-        this.bind(url, 'siftlyUrl');
+        this.bind(url, 'siftlyUrl', {
+          onChanged: (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+              currentUrlValue = newValue;
+              this.validator?.clearStatus();
+            }
+          }
+        });
       })
-      .addExtraButton((extraButton) => {
-        extraButton
-          .setIcon('wifi')
-          .setTooltip('Test the Siftly stats endpoint from this URL')
-          .onClick(() => {
-            this.verifySiftlyStatsConnection(siftlyStatsStatusEl).catch((error: unknown) => {
-              console.error(error);
-            });
+      .addButton((btn: ButtonComponent) => {
+        btn
+          .setButtonText('Validate')
+          .setCta()
+          .onClick(async () => {
+            if (currentUrlValue) {
+              await this.validator?.validate(currentUrlValue);
+            }
           });
-      });
+      })
+      .then(async () => {
+        this.siftlyStats = this.createSiftlyStatsElement(this.containerEl);
+        this.validator = new SiftlyStatsValidator(this.siftlyStats);
 
-    const siftlyStatsStatusEl = this.containerEl.createDiv({ cls: 'siftly-stats-validator-status' });
+        // Validate the current URL on load.
+        await this.validator.validate(this.plugin.settings.siftlyUrl);
+      });
 
     new SettingEx(this.containerEl)
       .setName('Sync folder')
@@ -299,8 +327,10 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       });
   }
 
-  private async verifySiftlyStatsConnection(statusEl: HTMLElement): Promise<void> {
-    const validator = new SiftlyStatsValidator(statusEl);
-    await validator.validate(this.plugin.settings.siftlyUrl);
+  private createSiftlyStatsElement(containerEl: HTMLElement): HTMLElement {
+    const siftlyStats = containerEl.createDiv({ cls: 'siftly-stats-info' });
+    siftlyStats.createDiv({ cls: 'siftly-stats-status' });
+    siftlyStats.createDiv({ cls: 'siftly-stats-details' });
+    return siftlyStats;
   }
 }
