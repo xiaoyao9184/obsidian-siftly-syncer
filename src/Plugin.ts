@@ -28,6 +28,7 @@ import { SampleEditorSuggest } from './EditorSuggests/SampleEditorSuggest.ts';
 import { SampleModal } from './Modals/SampleModal.ts';
 import { PluginSettingsManager } from './PluginSettingsManager.ts';
 import { PluginSettingsTab } from './PluginSettingsTab.ts';
+import { SiftlySyncer } from './utils/SiftlySyncer.ts';
 import {
   SAMPLE_REACT_VIEW_TYPE,
   SampleReactView
@@ -42,6 +43,15 @@ import {
 } from './Views/SampleView.ts';
 
 export class Plugin extends PluginBase<PluginTypes> {
+  public get siftlySyncer(): SiftlySyncer {
+    if (this.siftlySyncerInstance === null) {
+      throw new Error('SiftlySyncer is not initialized');
+    }
+    return this.siftlySyncerInstance;
+  }
+
+  private siftlySyncerInstance: null | SiftlySyncer = null;
+
   protected override createSettingsManager(): PluginSettingsManager {
     return new PluginSettingsManager(this);
   }
@@ -60,6 +70,8 @@ export class Plugin extends PluginBase<PluginTypes> {
 
   protected override async onloadImpl(): Promise<void> {
     await super.onloadImpl();
+    const { settings } = this.settingsManager.settingsWrapper;
+    this.siftlySyncerInstance = new SiftlySyncer(this.app, settings);
     this.addCommand({
       callback: this.runSampleCommand.bind(this),
       id: 'sample',
@@ -135,6 +147,7 @@ export class Plugin extends PluginBase<PluginTypes> {
   }
 
   protected override async onunloadImpl(): Promise<void> {
+    this.siftlySyncerInstance?.setSyncUiCallback(null);
     await super.onunloadImpl();
     new Notice('Sample plugin is being unloaded');
   }

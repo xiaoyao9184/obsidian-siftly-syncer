@@ -18,30 +18,29 @@ const HTTP_STATUS_SUCCESS_MIN = 200;
 const DEFAULT_PAGE_SIZE = 100;
 const SYNC_SUCCESS_NOTICE_HIDE_MS = 4000;
 const SYNC_ERROR_NOTICE_HIDE_MS = 8000;
-const STATUS_CLASS_PROGRESS = 'progress';
-const STATUS_CLASS_INVALID = 'invalid';
-const STATUS_CLASS_VALID = 'valid';
+
+export type SiftlySyncUiEvent =
+  | { kind: 'clear' }
+  | { kind: 'invalid'; message: string }
+  | { kind: 'progress'; syncedCount: number; syncedPage: number; totalBookmarks: number; totalPages: number }
+  | { kind: 'success'; syncedCount: number; totalBookmarks: number };
 
 export class SiftlySyncer {
   private readonly app: App;
   private readonly settings: PluginSettings;
-  private readonly statusEl: HTMLElement | null;
+  private syncUiCallback: ((event: SiftlySyncUiEvent) => void) | null = null;
 
-  public constructor(app: App, settings: PluginSettings, statusEl?: HTMLElement | null) {
+  public constructor(app: App, settings: PluginSettings) {
     this.app = app;
     this.settings = settings;
-    this.statusEl = statusEl ?? null;
   }
 
-  public clearStatus(): void {
-    this.statusEl?.empty();
-    this.statusEl?.removeClass(STATUS_CLASS_INVALID);
-    this.statusEl?.removeClass(STATUS_CLASS_PROGRESS);
-    this.statusEl?.removeClass(STATUS_CLASS_VALID);
+  public setSyncUiCallback(callback: ((event: SiftlySyncUiEvent) => void) | null): void {
+    this.syncUiCallback = callback;
   }
 
   public async sync(): Promise<boolean> {
-    this.clearStatus();
+    this.notifySyncUi({ kind: 'clear' });
 
     let progressNotice: Notice | undefined;
 
@@ -53,26 +52,23 @@ export class SiftlySyncer {
       await this.ensureFolderExists(this.settings.syncFolder);
 
       progressNotice = new Notice(
-        this.formatSyncProgressMessage(
-          0,
-          totalBookmarks
-        ),
+        formatSiftlySyncProgressLine(0, totalBookmarks),
         0
       );
 
       let syncedCount = 0;
       if (totalPages === 0) {
-        this.showSyncProgressStatus(syncedCount, totalBookmarks, 0, totalPages);
+        this.notifySyncUi({ kind: 'progress', syncedCount, syncedPage: 0, totalBookmarks, totalPages });
       }
       for (let page = 1; page <= totalPages; page++) {
-        this.showSyncProgressStatus(syncedCount, totalBookmarks, page, totalPages);
+        this.notifySyncUi({ kind: 'progress', syncedCount, syncedPage: page, totalBookmarks, totalPages });
         const pageData = await this.fetchBookmarksPage(page, pageSize);
         for (const bookmark of pageData.bookmarks) {
           await this.writeBookmarkNote(bookmark);
           syncedCount++;
-          this.showSyncProgressStatus(syncedCount, totalBookmarks, page, totalPages);
+          this.notifySyncUi({ kind: 'progress', syncedCount, syncedPage: page, totalBookmarks, totalPages });
           progressNotice.setMessage(
-            this.formatSyncProgressMessage(syncedCount, totalBookmarks)
+            formatSiftlySyncProgressLine(syncedCount, totalBookmarks)
           );
         }
       }
@@ -84,7 +80,7 @@ export class SiftlySyncer {
         progressNotice?.hide();
       }, SYNC_SUCCESS_NOTICE_HIDE_MS);
 
-      this.showSuccess(syncedCount, totalBookmarks);
+      this.notifySyncUi({ kind: 'success', syncedCount, totalBookmarks });
       return true;
     } catch (error) {
       console.error('Siftly sync error:', error);
@@ -95,7 +91,7 @@ export class SiftlySyncer {
           progressNotice?.hide();
         }, SYNC_ERROR_NOTICE_HIDE_MS);
       }
-      this.showInvalid(message);
+      this.notifySyncUi({ kind: 'invalid', message });
       return false;
     }
   }
@@ -168,40 +164,8 @@ export class SiftlySyncer {
     return json.totalBookmarks;
   }
 
-  private formatSyncProgressMessage(
-    done: number,
-    totalBookmarks: number
-  ): string {
-    return `Siftly: syncing: ${String(done)}/${String(totalBookmarks)} bookmarks`;
-  }
-
-  private showInvalid(message: string): void {
-    this.statusEl?.removeClass(STATUS_CLASS_VALID);
-    this.statusEl?.removeClass(STATUS_CLASS_PROGRESS);
-    this.statusEl?.addClass(STATUS_CLASS_INVALID);
-    this.statusEl?.setText(message);
-  }
-
-  private showSuccess(syncedCount: number, totalBookmarks: number): void {
-    this.statusEl?.removeClass(STATUS_CLASS_INVALID);
-    this.statusEl?.removeClass(STATUS_CLASS_PROGRESS);
-    this.statusEl?.addClass(STATUS_CLASS_VALID);
-    this.statusEl?.setText(`Synced ${String(syncedCount)}/${String(totalBookmarks)} bookmarks.`);
-  }
-
-  private showSyncProgressStatus(
-    syncedCount: number,
-    totalBookmarks: number
-  ): void {
-    if (this.statusEl === null) {
-      return;
-    }
-    this.statusEl.removeClass(STATUS_CLASS_VALID);
-    this.statusEl.removeClass(STATUS_CLASS_INVALID);
-    this.statusEl.addClass(STATUS_CLASS_PROGRESS);
-    this.statusEl.setText(
-      this.formatSyncProgressMessage(syncedCount, totalBookmarks)
-    );
+  private notifySyncUi(event: SiftlySyncUiEvent): void {
+    this.syncUiCallback?.(event);
   }
 
   private async writeBookmarkNote(bookmark: SiftlyBookmarkItemApiResponse): Promise<void> {
@@ -228,6 +192,10 @@ export function buildSiftlyBookmarksApiUrl(baseUrl: string, page: number, limit:
 
 export function buildSiftlyStatsApiUrl(baseUrl: string): string {
   return `${normalizeSiftlyBaseUrl(baseUrl)}/api/stats`;
+}
+
+export function formatSiftlySyncProgressLine(done: number, totalBookmarks: number): string {
+  return `Siftly: syncing: ${String(done)}/${String(totalBookmarks)} bookmarks`;
 }
 
 export function normalizeSiftlyBaseUrl(url: string): string {

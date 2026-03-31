@@ -6,20 +6,25 @@ import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/Plugin/Plugin
 import { SettingEx } from 'obsidian-dev-utils/obsidian/SettingEx';
 
 import type { PluginTypes } from './PluginTypes.ts';
+import type { SiftlySyncUiEvent } from './utils/SiftlySyncer.ts';
 
 import { TypedItem } from './PluginSettings.ts';
 import { SiftlyStatsValidator } from './utils/SiftlyStatsValidator.ts';
-import { SiftlySyncer } from './utils/SiftlySyncer.ts';
+import { formatSiftlySyncProgressLine } from './utils/SiftlySyncer.ts';
+
+const SYNC_STATS_CLASS_PROGRESS = 'progress';
+const SYNC_STATS_CLASS_INVALID = 'invalid';
+const SYNC_STATS_CLASS_VALID = 'valid';
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   private siftlyStats: HTMLElement | null = null;
-  private syncer: null | SiftlySyncer = null;
   private syncStats: HTMLElement | null = null;
   private validator: null | SiftlyStatsValidator = null;
   private validatorResult: boolean | undefined = undefined;
 
   public override display(): void {
     super.display();
+    this.plugin.siftlySyncer.setSyncUiCallback(null);
     const { containerEl } = this;
     containerEl.empty();
 
@@ -100,7 +105,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         button.setButtonText('Sync now')
           .onClick(async () => {
             if (this.validatorResult) {
-              await this.syncer?.sync();
+              await this.plugin.siftlySyncer.sync();
             } else {
               new Notice('Please validate the Siftly URL first.');
             }
@@ -108,8 +113,9 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       })
       .then(async () => {
         this.syncStats = this.createSyncStatsElement(this.containerEl);
-        const { settings } = this.plugin.settingsManager.settingsWrapper;
-        this.syncer = new SiftlySyncer(this.app, settings, this.syncStats);
+        this.plugin.siftlySyncer.setSyncUiCallback((event) => {
+          this.applySiftlySyncUiToSyncStats(event);
+        });
       });
 
     new SettingEx(this.containerEl)
@@ -371,6 +377,50 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         })
           .setPlaceholder('Enter a value');
       });
+  }
+
+  private applySiftlySyncUiToSyncStats(event: SiftlySyncUiEvent): void {
+    const el = this.syncStats;
+    if (el === null) {
+      return;
+    }
+    switch (event.kind) {
+      case 'clear': {
+        el.empty();
+        el.removeClass(SYNC_STATS_CLASS_INVALID);
+        el.removeClass(SYNC_STATS_CLASS_PROGRESS);
+        el.removeClass(SYNC_STATS_CLASS_VALID);
+        return;
+      }
+      case 'invalid': {
+        el.removeClass(SYNC_STATS_CLASS_VALID);
+        el.removeClass(SYNC_STATS_CLASS_PROGRESS);
+        el.addClass(SYNC_STATS_CLASS_INVALID);
+        el.setText(event.message);
+        return;
+      }
+      case 'progress': {
+        el.removeClass(SYNC_STATS_CLASS_VALID);
+        el.removeClass(SYNC_STATS_CLASS_INVALID);
+        el.addClass(SYNC_STATS_CLASS_PROGRESS);
+        el.setText(
+          `Syncing ${String(event.syncedPage)}/${String(event.totalPages)} pages - ${String(event.syncedCount)}/${String(event.totalBookmarks)} bookmarks.`
+        );
+        return;
+      }
+      case 'success': {
+        el.removeClass(SYNC_STATS_CLASS_INVALID);
+        el.removeClass(SYNC_STATS_CLASS_PROGRESS);
+        el.addClass(SYNC_STATS_CLASS_VALID);
+        el.setText(
+          `Synced ${String(event.syncedCount)}/${String(event.totalBookmarks)} bookmarks.`
+        );
+        break;
+      }
+      default: {
+        break;
+      }
+    }
   }
 
   private createSiftlyStatsElement(containerEl: HTMLElement): HTMLElement {
