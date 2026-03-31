@@ -5,7 +5,7 @@ import type { SiftlyStatsApiResponse } from '../Models/SiftlyStats.ts';
 const HTTP_STATUS_SUCCESS_MAX = 299;
 const HTTP_STATUS_SUCCESS_MIN = 200;
 
-export class SiftlyStatsValidator {
+export class SiftlyValidator {
   private readonly statusEl: HTMLElement | null;
 
   public constructor(statusEl?: HTMLElement | null) {

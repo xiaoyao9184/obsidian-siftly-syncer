@@ -9,7 +9,7 @@ import type { PluginTypes } from './PluginTypes.ts';
 import type { SiftlySyncProgressEvent } from './utils/SiftlySyncer.ts';
 
 import { TypedItem } from './PluginSettings.ts';
-import { SiftlyStatsValidator } from './utils/SiftlyStatsValidator.ts';
+import { SiftlyValidator } from './utils/SiftlyValidator.ts';
 
 const SYNC_STATS_CLASS_PROGRESS = 'progress';
 const SYNC_STATS_CLASS_INVALID = 'invalid';
@@ -19,7 +19,7 @@ const SYNC_STATS_CLASS_LAST = 'last';
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   private siftlyStats: HTMLElement | null = null;
   private syncStats: HTMLElement | null = null;
-  private validator: null | SiftlyStatsValidator = null;
+  private validator: null | SiftlyValidator = null;
   private validatorResult: boolean | undefined = undefined;
 
   public override display(): void {
@@ -62,7 +62,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       })
       .then(async () => {
         this.siftlyStats = this.createSiftlyStatsElement(this.containerEl);
-        this.validator = new SiftlyStatsValidator(this.siftlyStats);
+        this.validator = new SiftlyValidator(this.siftlyStats);
 
         // Validate the current URL on load.
         this.validatorResult = await this.validator.validate(this.plugin.settings.siftlyUrl);

@@ -30,13 +30,13 @@ import { SampleModal } from './Modals/SampleModal.ts';
 import { PluginSettingsManager } from './PluginSettingsManager.ts';
 import { PluginSettingsTab } from './PluginSettingsTab.ts';
 import {
-  normalizeSiftlyBaseUrl,
-  SiftlyStatsValidator
-} from './utils/SiftlyStatsValidator.ts';
-import {
   formatSiftlySyncProgressLine,
   SiftlySyncer
 } from './utils/SiftlySyncer.ts';
+import {
+  normalizeSiftlyBaseUrl,
+  SiftlyValidator
+} from './utils/SiftlyValidator.ts';
 import {
   SAMPLE_REACT_VIEW_TYPE,
   SampleReactView
@@ -310,7 +310,7 @@ export class Plugin extends PluginBase<PluginTypes> {
       return;
     }
 
-    const validator = new SiftlyStatsValidator();
+    const validator = new SiftlyValidator();
     const isValid = await validator.validate(this.settingsManager.settingsWrapper.settings.siftlyUrl);
     if (!isValid) {
       statusBarItemEl.empty();
