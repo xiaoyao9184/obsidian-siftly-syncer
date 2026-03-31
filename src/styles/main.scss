@@ -66,3 +66,22 @@
 .sync-stats-info.last {
   border-left: 3px solid var(--background-modifier-border);
 }
+
+.siftly-status-logo {
+  width: 16px;
+  height: 16px;
+}
+
+.siftly-status-spinning {
+  animation: siftly-status-spin 1s linear infinite;
+}
+
+@keyframes siftly-status-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}

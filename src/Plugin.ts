@@ -10,7 +10,8 @@ import type { ReadonlyDeep } from 'type-fest';
 
 import {
   MarkdownView,
-  Notice
+  Notice,
+  requestUrl
 } from 'obsidian';
 import { convertAsyncToSync } from 'obsidian-dev-utils/Async';
 import { getDebugger } from 'obsidian-dev-utils/Debug';
@@ -28,7 +29,14 @@ import { SampleEditorSuggest } from './EditorSuggests/SampleEditorSuggest.ts';
 import { SampleModal } from './Modals/SampleModal.ts';
 import { PluginSettingsManager } from './PluginSettingsManager.ts';
 import { PluginSettingsTab } from './PluginSettingsTab.ts';
-import { SiftlySyncer } from './utils/SiftlySyncer.ts';
+import {
+  normalizeSiftlyBaseUrl,
+  SiftlyStatsValidator
+} from './utils/SiftlyStatsValidator.ts';
+import {
+  formatSiftlySyncProgressLine,
+  SiftlySyncer
+} from './utils/SiftlySyncer.ts';
 import {
   SAMPLE_REACT_VIEW_TYPE,
   SampleReactView
@@ -42,6 +50,11 @@ import {
   SampleView
 } from './Views/SampleView.ts';
 
+const SYNC_SUCCESS_NOTICE_HIDE_MS = 4000;
+const SYNC_ERROR_NOTICE_HIDE_MS = 8000;
+const HTTP_STATUS_SUCCESS_MAX = 299;
+const HTTP_STATUS_SUCCESS_MIN = 200;
+
 export class Plugin extends PluginBase<PluginTypes> {
   public get siftlySyncer(): SiftlySyncer {
     if (this.siftlySyncerInstance === null) {
@@ -51,6 +64,8 @@ export class Plugin extends PluginBase<PluginTypes> {
   }
 
   private siftlySyncerInstance: null | SiftlySyncer = null;
+  private statusBarItemEl: HTMLElement | null = null;
+  private syncProgressNotice: Notice | null = null;
 
   protected override createSettingsManager(): PluginSettingsManager {
     return new PluginSettingsManager(this);
@@ -72,6 +87,45 @@ export class Plugin extends PluginBase<PluginTypes> {
     await super.onloadImpl();
     const { settings } = this.settingsManager.settingsWrapper;
     this.siftlySyncerInstance = new SiftlySyncer(this.app, settings);
+    this.siftlySyncer.setProgressMonitor('notice', (event) => {
+      switch (event.kind) {
+        case 'clear':
+          this.syncProgressNotice?.hide();
+          break;
+        case 'invalid': {
+          const message = event.message;
+          if (this.syncProgressNotice === null) {
+            this.syncProgressNotice = new Notice(message, 0);
+          } else {
+            this.syncProgressNotice.setMessage(message);
+          }
+          window.setTimeout(() => {
+            this.syncProgressNotice?.hide();
+            this.syncProgressNotice = null;
+          }, SYNC_ERROR_NOTICE_HIDE_MS);
+          break;
+        }
+        case 'last':
+          break;
+        case 'progress':
+          break;
+        case 'success': {
+          const message = `Siftly: synced ${String(event.syncedCount)} bookmarks.`;
+          if (this.syncProgressNotice === null) {
+            this.syncProgressNotice = new Notice(message, 0);
+          } else {
+            this.syncProgressNotice.setMessage(message);
+          }
+          window.setTimeout(() => {
+            this.syncProgressNotice?.hide();
+            this.syncProgressNotice = null;
+          }, SYNC_SUCCESS_NOTICE_HIDE_MS);
+          break;
+        }
+        default:
+          break;
+      }
+    });
     this.addCommand({
       callback: this.runSampleCommand.bind(this),
       id: 'sample',
@@ -103,8 +157,52 @@ export class Plugin extends PluginBase<PluginTypes> {
     this.addRibbonIcon('dice', 'Sample ribbon icon', this.runSampleRibbonIconCommand.bind(this));
     this.addRibbonIcon('refresh-cw', 'Sync Siftly bookmarks', convertAsyncToSync(() => this.runSiftlySyncRibbonIconCommand()));
 
-    this.addStatusBarItem().setText('Sample status bar item');
-
+    this.statusBarItemEl = this.addStatusBarItem();
+    this.statusBarItemEl.empty();
+    this.statusBarItemEl.setAttribute('aria-label', 'Siftly');
+    this.statusBarItemEl.setAttribute('title', 'Siftly');
+    await this.refreshStatusBarIconBySiftlyStatus();
+    this.siftlySyncer.setProgressMonitor('status-bar', (event) => {
+      if (!this.statusBarItemEl) {
+        return;
+      }
+      switch (event.kind) {
+        case 'clear':
+          this.statusBarItemEl.removeClass('siftly-status-spinning');
+          this.statusBarItemEl.setAttribute('title', `Siftly - ${event.message || 'idle'}`);
+          break;
+        case 'invalid':
+          this.statusBarItemEl.removeClass('siftly-status-spinning');
+          this.statusBarItemEl.setAttribute('title', `Siftly - ${event.message}`);
+          break;
+        case 'last': {
+          this.statusBarItemEl.removeClass('siftly-status-spinning');
+          const formatted = event.latestImportedAt.toLocaleString();
+          this.statusBarItemEl.setAttribute('title', `Siftly - last synced at ${formatted}`);
+          break;
+        }
+        case 'progress':
+          this.statusBarItemEl.addClass('siftly-status-spinning');
+          this.statusBarItemEl.setAttribute(
+            'title',
+            `Siftly - ${formatSiftlySyncProgressLine(event.syncedCount, event.totalBookmarks)}`
+          );
+          break;
+        case 'success': {
+          this.statusBarItemEl.removeClass('siftly-status-spinning');
+          const formatted = event.latestImportedAt.toLocaleString();
+          this.statusBarItemEl.setAttribute(
+            'title',
+            `Siftly - synced ${String(event.syncedCount)} bookmarks (last at ${formatted})`
+          );
+          break;
+        }
+        default:
+          this.statusBarItemEl.removeClass('siftly-status-spinning');
+          this.statusBarItemEl.setAttribute('title', 'Siftly - idle');
+          break;
+      }
+    });
     this.registerDomEvent(document, 'dblclick', this.handleSampleDomEvent.bind(this));
 
     this.registerEditorExtension([sampleViewPlugin, sampleStateField]);
@@ -155,10 +253,16 @@ export class Plugin extends PluginBase<PluginTypes> {
     if (newSettings.settings.textSetting === 'baz' && oldSettings.settings.textSetting === 'bar') {
       new Notice('Sample text setting is changed from bar to baz');
     }
+    if (newSettings.settings.siftlyUrl !== oldSettings.settings.siftlyUrl) {
+      await this.refreshStatusBarIconBySiftlyStatus();
+    }
   }
 
   protected override async onunloadImpl(): Promise<void> {
-    this.siftlySyncerInstance?.setSyncUiCallback(null);
+    this.siftlySyncerInstance?.setProgressMonitor('status-bar', null);
+    this.siftlySyncerInstance?.setProgressMonitor('notice', null);
+    this.syncProgressNotice?.hide();
+    this.syncProgressNotice = null;
     await super.onunloadImpl();
     new Notice('Sample plugin is being unloaded');
   }
@@ -198,6 +302,44 @@ export class Plugin extends PluginBase<PluginTypes> {
 
   private async openView(viewType: string): Promise<void> {
     await this.app.workspace.ensureSideLeaf(viewType, 'right');
+  }
+
+  private async refreshStatusBarIconBySiftlyStatus(): Promise<void> {
+    const statusBarItemEl = this.statusBarItemEl;
+    if (statusBarItemEl === null) {
+      return;
+    }
+
+    const validator = new SiftlyStatsValidator();
+    const isValid = await validator.validate(this.settingsManager.settingsWrapper.settings.siftlyUrl);
+    if (!isValid) {
+      statusBarItemEl.empty();
+      statusBarItemEl.setText('❌');
+      return;
+    }
+
+    const logoUrl = `${normalizeSiftlyBaseUrl(this.settingsManager.settingsWrapper.settings.siftlyUrl)}/logo.svg`;
+    try {
+      const response = await requestUrl({
+        throw: false,
+        url: logoUrl
+      });
+      if (response.status < HTTP_STATUS_SUCCESS_MIN || response.status > HTTP_STATUS_SUCCESS_MAX) {
+        statusBarItemEl.empty();
+        statusBarItemEl.setText('❌');
+        return;
+      }
+    } catch {
+      statusBarItemEl.empty();
+      statusBarItemEl.setText('❌');
+      return;
+    }
+
+    statusBarItemEl.empty();
+    const logoEl = statusBarItemEl.createEl('img');
+    logoEl.src = logoUrl;
+    logoEl.alt = 'Siftly';
+    logoEl.addClass('siftly-status-logo');
   }
 
   private registerModalCommands(): void {

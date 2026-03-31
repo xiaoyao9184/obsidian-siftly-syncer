@@ -6,7 +6,7 @@ import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/Plugin/Plugin
 import { SettingEx } from 'obsidian-dev-utils/obsidian/SettingEx';
 
 import type { PluginTypes } from './PluginTypes.ts';
-import type { SiftlySyncUiEvent } from './utils/SiftlySyncer.ts';
+import type { SiftlySyncProgressEvent } from './utils/SiftlySyncer.ts';
 
 import { TypedItem } from './PluginSettings.ts';
 import { SiftlyStatsValidator } from './utils/SiftlyStatsValidator.ts';
@@ -24,7 +24,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
 
   public override display(): void {
     super.display();
-    this.plugin.siftlySyncer.setSyncUiCallback(null);
+    this.plugin.siftlySyncer.setProgressMonitor('setting-tab', null);
     const { containerEl } = this;
     containerEl.empty();
 
@@ -131,7 +131,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       })
       .then(async () => {
         this.syncStats = this.createSyncStatsElement(this.containerEl);
-        this.plugin.siftlySyncer.setSyncUiCallback((event) => {
+        this.plugin.siftlySyncer.setProgressMonitor('setting-tab', (event) => {
           this.applySiftlySyncUiToSyncStats(event);
         });
         const syncedLastTime = this.plugin.settings.syncedLastTime;
@@ -409,7 +409,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       });
   }
 
-  private applySiftlySyncUiToSyncStats(event: SiftlySyncUiEvent): void {
+  private applySiftlySyncUiToSyncStats(event: SiftlySyncProgressEvent): void {
     const el = this.syncStats;
     if (el === null) {
       return;

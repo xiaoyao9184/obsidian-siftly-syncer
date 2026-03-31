@@ -1,7 +1,6 @@
 import {
   App,
   normalizePath,
-  Notice,
   requestUrl,
   TFile
 } from 'obsidian';
@@ -21,25 +20,23 @@ const HTTP_STATUS_SUCCESS_MAX = 299;
 const HTTP_STATUS_SUCCESS_MIN = 200;
 const DEFAULT_PAGE_SIZE = 100;
 const BINARY_SEARCH_DIVISOR = 2;
-const SYNC_SUCCESS_NOTICE_HIDE_MS = 4000;
-const SYNC_ERROR_NOTICE_HIDE_MS = 8000;
 
-export interface SiftlySyncResult {
-  latestImportedAt: Date | null;
-  syncedCount: number;
-}
-
-export type SiftlySyncUiEvent =
+export type SiftlySyncProgressEvent =
   | { kind: 'clear'; message: string }
   | { kind: 'invalid'; message: string }
   | { kind: 'last'; latestImportedAt: Date }
   | { kind: 'progress'; syncedCount: number; syncedPage: number; totalBookmarks: number; totalPages: number }
   | { kind: 'success'; latestImportedAt: Date; syncedCount: number };
 
+export interface SiftlySyncResult {
+  latestImportedAt: Date | null;
+  syncedCount: number;
+}
+
 export class SiftlySyncer {
   private readonly app: App;
+  private readonly progressMonitors = new Map<string, (event: SiftlySyncProgressEvent) => void>();
   private readonly settings: PluginSettings;
-  private syncUiCallback: ((event: SiftlySyncUiEvent) => void) | null = null;
 
   public constructor(app: App, settings: PluginSettings) {
     this.app = app;
@@ -75,14 +72,17 @@ export class SiftlySyncer {
     return `media-${fallbackId}`;
   }
 
-  public setSyncUiCallback(callback: ((event: SiftlySyncUiEvent) => void) | null): void {
-    this.syncUiCallback = callback;
+  public setProgressMonitor(name: string, callback: ((event: SiftlySyncProgressEvent) => void) | null): void {
+    if (callback === null) {
+      this.progressMonitors.delete(name);
+      return;
+    }
+    this.progressMonitors.set(name, callback);
   }
 
   public async sync(syncIncremental: boolean = this.settings.syncIncremental): Promise<SiftlySyncResult> {
     this.notifySyncUi({ kind: 'clear', message: 'Syncing: STARTED' });
 
-    let progressNotice: Notice | undefined;
     let latestImportedAt: Date = new Date(0);
     let latestImportedAtTimestamp = Number.NEGATIVE_INFINITY;
     let syncedCount = 0;
@@ -95,11 +95,6 @@ export class SiftlySyncer {
 
       await this.ensureFolderExists(this.settings.syncFolder);
       await this.ensureFolderExists(this.settings.syncAttachmentsFolder);
-
-      progressNotice = new Notice(
-        formatSiftlySyncProgressLine(0, totalBookmarks),
-        0
-      );
 
       if (totalPages === 0) {
         this.notifySyncUi({ kind: 'progress', syncedCount, syncedPage: 0, totalBookmarks, totalPages });
@@ -116,30 +111,14 @@ export class SiftlySyncer {
           await this.writeBookmarkNote(bookmark);
           syncedCount++;
           this.notifySyncUi({ kind: 'progress', syncedCount, syncedPage: page, totalBookmarks, totalPages });
-          progressNotice.setMessage(
-            formatSiftlySyncProgressLine(syncedCount, totalBookmarks)
-          );
         }
       }
-
-      progressNotice.setMessage(
-        `Siftly: synced ${String(syncedCount)}/${String(totalBookmarks)} bookmarks.`
-      );
-      window.setTimeout(() => {
-        progressNotice?.hide();
-      }, SYNC_SUCCESS_NOTICE_HIDE_MS);
 
       this.notifySyncUi({ kind: 'success', latestImportedAt, syncedCount });
       return { latestImportedAt, syncedCount };
     } catch (error) {
       console.error('Siftly sync error:', error);
       const message = `Failed to sync bookmarks from Siftly: ${String(error)}`;
-      if (progressNotice !== undefined) {
-        progressNotice.setMessage(message);
-        window.setTimeout(() => {
-          progressNotice?.hide();
-        }, SYNC_ERROR_NOTICE_HIDE_MS);
-      }
       this.notifySyncUi({ kind: 'invalid', message });
       return {
         latestImportedAt: null,
@@ -298,8 +277,10 @@ export class SiftlySyncer {
     return json.totalBookmarks;
   }
 
-  private notifySyncUi(event: SiftlySyncUiEvent): void {
-    this.syncUiCallback?.(event);
+  private notifySyncUi(event: SiftlySyncProgressEvent): void {
+    for (const callback of this.progressMonitors.values()) {
+      callback(event);
+    }
   }
 
   private async resolveTotalBookmarksForSync(totalBookmarks: number, syncIncremental: boolean): Promise<number> {
