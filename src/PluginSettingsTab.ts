@@ -10,11 +10,11 @@ import type { SiftlySyncUiEvent } from './utils/SiftlySyncer.ts';
 
 import { TypedItem } from './PluginSettings.ts';
 import { SiftlyStatsValidator } from './utils/SiftlyStatsValidator.ts';
-import { formatSiftlySyncProgressLine } from './utils/SiftlySyncer.ts';
 
 const SYNC_STATS_CLASS_PROGRESS = 'progress';
 const SYNC_STATS_CLASS_INVALID = 'invalid';
 const SYNC_STATS_CLASS_VALID = 'valid';
+const SYNC_STATS_CLASS_LAST = 'last';
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   private siftlyStats: HTMLElement | null = null;
@@ -105,7 +105,18 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         button.setButtonText('Sync now')
           .onClick(async () => {
             if (this.validatorResult) {
-              await this.plugin.siftlySyncer.sync();
+              const syncResult = await this.plugin.siftlySyncer.sync();
+              if (syncResult.latestImportedAt !== null) {
+                const syncedLastTime = syncResult.latestImportedAt;
+                await this.plugin.settingsManager.editAndSave((settings) => {
+                  settings.syncedLastTime = syncedLastTime;
+                });
+                this.applySiftlySyncUiToSyncStats({
+                  kind: 'success',
+                  latestImportedAt: syncedLastTime,
+                  syncedCount: syncResult.syncedCount
+                });
+              }
             } else {
               new Notice('Please validate the Siftly URL first.');
             }
@@ -116,6 +127,18 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         this.plugin.siftlySyncer.setSyncUiCallback((event) => {
           this.applySiftlySyncUiToSyncStats(event);
         });
+        const syncedLastTime = this.plugin.settings.syncedLastTime;
+        if (syncedLastTime === null) {
+          this.applySiftlySyncUiToSyncStats({
+            kind: 'clear',
+            message: 'Synced: NEVER'
+          });
+        } else {
+          this.applySiftlySyncUiToSyncStats({
+            kind: 'last',
+            latestImportedAt: syncedLastTime
+          });
+        }
       });
 
     new SettingEx(this.containerEl)
@@ -386,20 +409,35 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
     }
     switch (event.kind) {
       case 'clear': {
-        el.empty();
         el.removeClass(SYNC_STATS_CLASS_INVALID);
+        el.removeClass(SYNC_STATS_CLASS_LAST);
         el.removeClass(SYNC_STATS_CLASS_PROGRESS);
         el.removeClass(SYNC_STATS_CLASS_VALID);
-        return;
-      }
-      case 'invalid': {
-        el.removeClass(SYNC_STATS_CLASS_VALID);
-        el.removeClass(SYNC_STATS_CLASS_PROGRESS);
-        el.addClass(SYNC_STATS_CLASS_INVALID);
         el.setText(event.message);
         return;
       }
+      case 'invalid': {
+        el.removeClass(SYNC_STATS_CLASS_LAST);
+        el.removeClass(SYNC_STATS_CLASS_VALID);
+        el.removeClass(SYNC_STATS_CLASS_PROGRESS);
+        el.addClass(SYNC_STATS_CLASS_INVALID);
+        el.setText(
+          `Invalid: ${event.message}`
+        );
+        return;
+      }
+      case 'last': {
+        el.removeClass(SYNC_STATS_CLASS_INVALID);
+        el.removeClass(SYNC_STATS_CLASS_PROGRESS);
+        el.removeClass(SYNC_STATS_CLASS_VALID);
+        el.addClass(SYNC_STATS_CLASS_LAST);
+        el.setText(
+          `Synced: last @ ${event.latestImportedAt.toLocaleString()}`
+        );
+        return;
+      }
       case 'progress': {
+        el.removeClass(SYNC_STATS_CLASS_LAST);
         el.removeClass(SYNC_STATS_CLASS_VALID);
         el.removeClass(SYNC_STATS_CLASS_INVALID);
         el.addClass(SYNC_STATS_CLASS_PROGRESS);
@@ -409,11 +447,12 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         return;
       }
       case 'success': {
+        el.removeClass(SYNC_STATS_CLASS_LAST);
         el.removeClass(SYNC_STATS_CLASS_INVALID);
         el.removeClass(SYNC_STATS_CLASS_PROGRESS);
         el.addClass(SYNC_STATS_CLASS_VALID);
         el.setText(
-          `Synced ${String(event.syncedCount)}/${String(event.totalBookmarks)} bookmarks.`
+          `Synced ${String(event.syncedCount)} bookmarks @ ${event.latestImportedAt.toLocaleString()}`
         );
         break;
       }

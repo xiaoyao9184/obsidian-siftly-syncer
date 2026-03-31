@@ -54,3 +54,15 @@
 .sync-stats-info.progress {
   border-left: 3px solid var(--color-blue);
 }
+
+.siftly-stats-info.last,
+.siftly-stats-status.last,
+.sync-stats-info.last,
+.sync-stats-status.last {
+  color: var(--text-muted);
+}
+
+.siftly-stats-info.last,
+.sync-stats-info.last {
+  border-left: 3px solid var(--background-modifier-border);
+}

@@ -49,6 +49,7 @@ export class PluginSettings {
   public siftlyUrl = 'http://localhost:3000';
   public sliderSetting = 50;
   public syncAttachmentsFolder = '@Siftly/attachments';
+  public syncedLastTime: Date | null = null;
   public syncFolder = '@Siftly';
   public textAreaSetting = 'defaultTextArea';
   public textSetting = 'defaultText';

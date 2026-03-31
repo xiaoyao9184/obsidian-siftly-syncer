@@ -23,11 +23,17 @@ const DEFAULT_PAGE_SIZE = 100;
 const SYNC_SUCCESS_NOTICE_HIDE_MS = 4000;
 const SYNC_ERROR_NOTICE_HIDE_MS = 8000;
 
+export interface SiftlySyncResult {
+  latestImportedAt: Date | null;
+  syncedCount: number;
+}
+
 export type SiftlySyncUiEvent =
-  | { kind: 'clear' }
+  | { kind: 'clear'; message: string }
   | { kind: 'invalid'; message: string }
+  | { kind: 'last'; latestImportedAt: Date }
   | { kind: 'progress'; syncedCount: number; syncedPage: number; totalBookmarks: number; totalPages: number }
-  | { kind: 'success'; syncedCount: number; totalBookmarks: number };
+  | { kind: 'success'; latestImportedAt: Date; syncedCount: number };
 
 export class SiftlySyncer {
   private readonly app: App;
@@ -72,10 +78,13 @@ export class SiftlySyncer {
     this.syncUiCallback = callback;
   }
 
-  public async sync(): Promise<boolean> {
-    this.notifySyncUi({ kind: 'clear' });
+  public async sync(): Promise<SiftlySyncResult> {
+    this.notifySyncUi({ kind: 'clear', message: 'Syncing: STARTED' });
 
     let progressNotice: Notice | undefined;
+    let latestImportedAt: Date = new Date(0);
+    let latestImportedAtTimestamp = Number.NEGATIVE_INFINITY;
+    let syncedCount = 0;
 
     try {
       const totalBookmarks = await this.fetchTotalBookmarks();
@@ -90,7 +99,6 @@ export class SiftlySyncer {
         0
       );
 
-      let syncedCount = 0;
       if (totalPages === 0) {
         this.notifySyncUi({ kind: 'progress', syncedCount, syncedPage: 0, totalBookmarks, totalPages });
       }
@@ -98,6 +106,11 @@ export class SiftlySyncer {
         this.notifySyncUi({ kind: 'progress', syncedCount, syncedPage: page, totalBookmarks, totalPages });
         const pageData = await this.fetchBookmarksPage(page, pageSize);
         for (const bookmark of pageData.bookmarks) {
+          const importedAtTimestamp = Date.parse(bookmark.importedAt);
+          if (Number.isFinite(importedAtTimestamp) && importedAtTimestamp > latestImportedAtTimestamp) {
+            latestImportedAtTimestamp = importedAtTimestamp;
+            latestImportedAt = new Date(importedAtTimestamp);
+          }
           await this.writeBookmarkNote(bookmark);
           syncedCount++;
           this.notifySyncUi({ kind: 'progress', syncedCount, syncedPage: page, totalBookmarks, totalPages });
@@ -114,8 +127,8 @@ export class SiftlySyncer {
         progressNotice?.hide();
       }, SYNC_SUCCESS_NOTICE_HIDE_MS);
 
-      this.notifySyncUi({ kind: 'success', syncedCount, totalBookmarks });
-      return true;
+      this.notifySyncUi({ kind: 'success', latestImportedAt, syncedCount });
+      return { latestImportedAt, syncedCount };
     } catch (error) {
       console.error('Siftly sync error:', error);
       const message = `Failed to sync bookmarks from Siftly: ${String(error)}`;
@@ -126,7 +139,10 @@ export class SiftlySyncer {
         }, SYNC_ERROR_NOTICE_HIDE_MS);
       }
       this.notifySyncUi({ kind: 'invalid', message });
-      return false;
+      return {
+        latestImportedAt: null,
+        syncedCount
+      };
     }
   }
 
