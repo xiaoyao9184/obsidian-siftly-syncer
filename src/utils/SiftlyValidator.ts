@@ -1,6 +1,6 @@
 import { requestUrl } from 'obsidian';
 
-import type { SiftlyStatsApiResponse } from '../Models/SiftlyStats.ts';
+import type { SiftlyStatsApiResponse } from '../models/SiftlyStats.ts';
 
 const HTTP_STATUS_SUCCESS_MAX = 299;
 const HTTP_STATUS_SUCCESS_MIN = 200;

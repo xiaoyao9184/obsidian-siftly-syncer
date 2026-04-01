@@ -9,8 +9,8 @@ import type {
   SiftlyBookmarkApiResponse,
   SiftlyBookmarkItemApiResponse,
   SiftlyMediaItem
-} from '../Models/SiftlyBookmark.ts';
-import type { SiftlyStatsApiResponse } from '../Models/SiftlyStats.ts';
+} from '../models/SiftlyBookmark.ts';
+import type { SiftlyStatsApiResponse } from '../models/SiftlyStats.ts';
 import type { PluginSettings } from '../PluginSettings.ts';
 
 import { SiftlyFilenamer } from './SiftlyFilenamer.ts';

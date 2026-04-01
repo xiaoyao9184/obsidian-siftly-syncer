@@ -1,4 +1,4 @@
-import type { SiftlyBookmarkItemApiResponse } from '../Models/SiftlyBookmark.ts';
+import type { SiftlyBookmarkItemApiResponse } from '../models/SiftlyBookmark.ts';
 
 export const SiftlyFilerender = {
   renderBookmarkNote(bookmark: SiftlyBookmarkItemApiResponse): string {
