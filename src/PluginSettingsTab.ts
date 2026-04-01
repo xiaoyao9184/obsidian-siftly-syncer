@@ -11,14 +11,14 @@ import type { SiftlySyncProgressEvent } from './utils/SiftlySyncer.ts';
 import { TypedItem } from './PluginSettings.ts';
 import { SiftlyValidator } from './utils/SiftlyValidator.ts';
 
-const SYNC_STATS_CLASS_PROGRESS = 'progress';
-const SYNC_STATS_CLASS_INVALID = 'invalid';
-const SYNC_STATS_CLASS_VALID = 'valid';
-const SYNC_STATS_CLASS_LAST = 'last';
+const SYNC_PROGRESS_PERCENT_MAX = 100;
+const SYNC_PROGRESS_SETTING_HIDDEN_CLASS = 'siftly-sync-progress-setting-hidden';
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
-  private siftlyStats: HTMLElement | null = null;
-  private syncStats: HTMLElement | null = null;
+  private siftlyStatsElement: HTMLElement | null = null;
+  private syncBookmarksProgressBar: { setValue: (value: number) => void } | null = null;
+  private syncPagesProgressBar: { setValue: (value: number) => void } | null = null;
+  private syncProgressElement: HTMLElement | null = null;
   private validator: null | SiftlyValidator = null;
   private validatorResult: boolean | undefined = undefined;
 
@@ -61,8 +61,8 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           });
       })
       .then(async () => {
-        this.siftlyStats = this.createSiftlyStatsElement(this.containerEl);
-        this.validator = new SiftlyValidator(this.siftlyStats);
+        this.siftlyStatsElement = this.createSiftlyStatsElement(this.containerEl);
+        this.validator = new SiftlyValidator(this.siftlyStatsElement);
 
         // Validate the current URL on load.
         this.validatorResult = await this.validator.validate(this.plugin.settings.siftlyUrl);
@@ -118,34 +118,37 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
                 await this.plugin.settingsManager.editAndSave((settings) => {
                   settings.syncedLastTime = syncedLastTime;
                 });
-                this.updateSyncStats({
-                  kind: 'success',
-                  latestImportedAt: syncedLastTime,
-                  syncedCount: syncResult.syncedCount
-                });
               }
             } else {
               new Notice('Please validate the Siftly URL first.');
             }
           });
+      });
+
+    new SettingEx(this.containerEl)
+      .setName('Sync progress')
+      .setDesc('Progress while bookmarks are being synchronized')
+      .addProgressBar((progressBar) => {
+        this.syncPagesProgressBar = progressBar;
+        progressBar.setValue(0);
       })
-      .then(async () => {
-        this.syncStats = this.createSyncStatsElement(this.containerEl);
+      .addProgressBar((progressBar) => {
+        this.syncBookmarksProgressBar = progressBar;
+        progressBar.setValue(0);
+      }).then((settingEx) => {
+        this.syncProgressElement = settingEx.settingEl;
+        this.syncProgressElement.addClass(SYNC_PROGRESS_SETTING_HIDDEN_CLASS);
+
         this.plugin.siftlySyncer.setProgressMonitor('setting-tab', (event) => {
-          this.updateSyncStats(event);
+          this.updateSyncProgressBarValues(event);
         });
-        const syncedLastTime = this.plugin.settings.syncedLastTime;
-        if (syncedLastTime.getTime() <= 0) {
-          this.updateSyncStats({
-            kind: 'never',
-            message: 'Please synchronize first.'
-          });
-        } else {
-          this.updateSyncStats({
-            kind: 'last',
-            latestImportedAt: syncedLastTime
-          });
-        }
+      });
+
+    new SettingEx(this.containerEl)
+      .setName('Last sync time')
+      .setDesc('Time of the last successful sync (updates when bookmarks are synchronized)')
+      .addDateTime((date) => {
+        this.bind(date, 'syncedLastTime');
       });
 
     new SettingEx(this.containerEl)
@@ -416,70 +419,35 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
     return siftlyStats;
   }
 
-  private createSyncStatsElement(containerEl: HTMLElement): HTMLElement {
-    const syncStats = containerEl.createDiv({ cls: 'sync-stats-info' });
-    syncStats.createDiv({ cls: 'sync-stats-status' });
-    syncStats.createDiv({ cls: 'sync-stats-details' });
-    return syncStats;
-  }
-
-  private updateSyncStats(event: SiftlySyncProgressEvent): void {
-    const el = this.syncStats;
+  private setSyncProgressSettingVisible(visible: boolean): void {
+    const el = this.syncProgressElement;
     if (el === null) {
       return;
     }
+    if (visible) {
+      el.removeClass(SYNC_PROGRESS_SETTING_HIDDEN_CLASS);
+    } else {
+      el.addClass(SYNC_PROGRESS_SETTING_HIDDEN_CLASS);
+    }
+  }
+
+  private updateSyncProgressBarValues(event: SiftlySyncProgressEvent): void {
+    const barPages = this.syncPagesProgressBar;
+    const barBookmarks = this.syncBookmarksProgressBar;
+    if (barPages === null || barBookmarks === null) {
+      return;
+    }
     switch (event.kind) {
-      case 'invalid': {
-        el.removeClass(SYNC_STATS_CLASS_LAST);
-        el.removeClass(SYNC_STATS_CLASS_VALID);
-        el.removeClass(SYNC_STATS_CLASS_PROGRESS);
-        el.addClass(SYNC_STATS_CLASS_INVALID);
-        el.setText(
-          `Invalid: ${event.message}`
-        );
-        return;
-      }
-      case 'last': {
-        el.removeClass(SYNC_STATS_CLASS_INVALID);
-        el.removeClass(SYNC_STATS_CLASS_PROGRESS);
-        el.removeClass(SYNC_STATS_CLASS_VALID);
-        el.addClass(SYNC_STATS_CLASS_LAST);
-        el.setText(
-          `Synced: last @ ${event.latestImportedAt.toLocaleString()}`
-        );
-        return;
-      }
-      case 'never': {
-        el.removeClass(SYNC_STATS_CLASS_INVALID);
-        el.removeClass(SYNC_STATS_CLASS_LAST);
-        el.removeClass(SYNC_STATS_CLASS_PROGRESS);
-        el.removeClass(SYNC_STATS_CLASS_VALID);
-        el.setText(
-          `Never: ${event.message}`
-        );
-        return;
-      }
       case 'progress': {
-        el.removeClass(SYNC_STATS_CLASS_LAST);
-        el.removeClass(SYNC_STATS_CLASS_VALID);
-        el.removeClass(SYNC_STATS_CLASS_INVALID);
-        el.addClass(SYNC_STATS_CLASS_PROGRESS);
-        el.setText(
-          `Syncing ${String(event.syncedPage)}/${String(event.totalPages)} pages - ${String(event.syncedCount)}/${String(event.totalBookmarks)} bookmarks.`
-        );
-        return;
-      }
-      case 'success': {
-        el.removeClass(SYNC_STATS_CLASS_LAST);
-        el.removeClass(SYNC_STATS_CLASS_INVALID);
-        el.removeClass(SYNC_STATS_CLASS_PROGRESS);
-        el.addClass(SYNC_STATS_CLASS_VALID);
-        el.setText(
-          `Synced ${String(event.syncedCount)} bookmarks @ ${event.latestImportedAt.toLocaleString()}`
-        );
+        this.setSyncProgressSettingVisible(true);
+        barPages.setValue((event.syncedPage / event.totalPages) * SYNC_PROGRESS_PERCENT_MAX);
+        barBookmarks.setValue((event.syncedCount / event.totalBookmarks) * SYNC_PROGRESS_PERCENT_MAX);
         break;
       }
       default: {
+        barPages.setValue(0);
+        barBookmarks.setValue(0);
+        this.setSyncProgressSettingVisible(false);
         break;
       }
     }

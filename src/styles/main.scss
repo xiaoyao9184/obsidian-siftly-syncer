@@ -20,51 +20,21 @@
 
 /* Siftly status indicators */
 .siftly-stats-info.valid,
-.siftly-stats-status.valid,
-.sync-stats-info.valid,
-.sync-stats-status.valid {
+.siftly-stats-status.valid {
   color: var(--color-green);
 }
 
 .siftly-stats-info.invalid,
-.siftly-stats-status.invalid,
-.sync-stats-info.invalid,
-.sync-stats-status.invalid {
+.siftly-stats-status.invalid {
   color: var(--color-red);
 }
 
-.siftly-stats-info.valid,
-.sync-stats-info.valid {
+.siftly-stats-info.valid {
   border-left: 3px solid var(--color-green);
 }
 
-.siftly-stats-info.invalid,
-.sync-stats-info.invalid {
+.siftly-stats-info.invalid {
   border-left: 3px solid var(--color-red);
-}
-
-.siftly-stats-info.progress,
-.siftly-stats-status.progress,
-.sync-stats-info.progress,
-.sync-stats-status.progress {
-  color: var(--color-blue);
-}
-
-.siftly-stats-info.progress,
-.sync-stats-info.progress {
-  border-left: 3px solid var(--color-blue);
-}
-
-.siftly-stats-info.last,
-.siftly-stats-status.last,
-.sync-stats-info.last,
-.sync-stats-status.last {
-  color: var(--text-muted);
-}
-
-.siftly-stats-info.last,
-.sync-stats-info.last {
-  border-left: 3px solid var(--background-modifier-border);
 }
 
 .siftly-status-logo {
@@ -84,4 +54,9 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Settings: sync progress row — display:none removes layout gap (toggleVisibility does not). */
+.siftly-sync-progress-setting-hidden {
+  display: none !important;
 }
