@@ -1,4 +1,4 @@
-// eslint-disable-next-line import-x/no-unassigned-import, import-x/no-empty-named-blocks
+// eslint-disable-next-line import-x/no-unassigned-import, import-x/no-empty-named-blocks -- Side-effect import and empty type import are required by Obsidian typings/bootstrap pattern.
 import type {} from 'obsidian-typings'; // Do not delete this line if you want to use unofficial internal obsidian API.
 
 import './styles/main.scss'; // Do not delete this line if you want to have a styles.css file in your build output.
