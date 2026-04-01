@@ -1,6 +1,7 @@
 {
   "version": "0.2",
   "ignorePaths": [
+    ".specstory",
     "dist",
     "node_modules",
     "tsconfig.tsbuildinfo"
@@ -11,7 +12,13 @@
     "commitlint",
     "dblclick",
     "obsidianmd",
-    "tsbuildinfo"
+    "tsbuildinfo",
+    "specstory",
+    "Filenamer",
+    "Filerender",
+    "siftly",
+    "syncer",
+    "xiaoyao"
   ],
   "ignoreWords": [],
   "import": [],
