@@ -5,6 +5,12 @@ import { obsidianDevUtilsConfigs } from 'obsidian-dev-utils/ScriptUtils/ESLint/e
 const configs: Linter.Config[] = [
   ...obsidianDevUtilsConfigs,
   {
+    files: ['package.json'],
+    rules: {
+      'depend/ban-dependencies': ['error', { allowed: ['moment'] }]
+    }
+  },
+  {
     rules: {
       'obsidianmd/ui/sentence-case': [
         'error',
