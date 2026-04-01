@@ -1,6 +1,6 @@
 import type {
- SiftlyBookmarkItemApiResponse,
- SiftlyCategory
+  SiftlyBookmarkItemApiResponse,
+  SiftlyCategory
 } from './SiftlyBookmark.ts';
 
 import { SiftlyBookmark } from './SiftlyBookmark.ts';

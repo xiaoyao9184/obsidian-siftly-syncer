@@ -35,8 +35,7 @@ function sanitizeTextSuffix(text: string): string {
     .replace(/-+/gu, '-')
     .replace(/^-|-$/gu, '');
 
-  const maxSuffixLength =
-    MAX_NOTE_FILENAME_LENGTH
+  const maxSuffixLength = MAX_NOTE_FILENAME_LENGTH
     - DAY_PART_LENGTH
     - DAY_PREFIX_SEPARATOR_LENGTH
     - MARKDOWN_EXTENSION_LENGTH;
