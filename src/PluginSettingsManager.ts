@@ -1,58 +1,98 @@
-import type { MaybeReturn } from 'obsidian-dev-utils/Type';
-
 import { PluginSettingsManagerBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginSettingsManagerBase';
 
 import type { PluginTypes } from './PluginTypes.ts';
 
-import {
-  PluginSettings,
-  TypedItem
-} from './PluginSettings.ts';
+import { PluginSettings } from './PluginSettings.ts';
 
-interface SerializedSettings {
-  typedDropdownSetting: string;
-  typedMultipleDropdownSetting: string[];
+const RECORD_VERSION_KEY = 'version';
+
+interface Migration {
+  fromVersion: string;
+  migrate: (record: SettingsRecord) => Promise<void> | void;
+  toVersion: string;
 }
+
+type SettingsRecord = Record<string, unknown>;
+
+const MIGRATIONS: readonly Migration[] = [
+  {
+    fromVersion: '0.0.0',
+    migrate(record): void {
+      record['version'] = '0.0.1';
+    },
+    toVersion: '0.0.1'
+  }
+];
 
 export class PluginSettingsManager extends PluginSettingsManagerBase<PluginTypes> {
   protected override createDefaultSettings(): PluginSettings {
     return new PluginSettings();
   }
 
-  protected override async onLoadRecord(record: Record<string, unknown>): Promise<void> {
+  protected override async onLoadRecord(record: SettingsRecord): Promise<void> {
     await super.onLoadRecord(record);
-    const serializedSettings = record as Partial<SerializedSettings>;
-    const pluginSettings = record as Partial<PluginSettings>;
-
-    if (serializedSettings.typedDropdownSetting) {
-      pluginSettings.typedDropdownSetting = TypedItem.deserialize(serializedSettings.typedDropdownSetting);
-    }
-
-    if (serializedSettings.typedMultipleDropdownSetting) {
-      pluginSettings.typedMultipleDropdownSetting = serializedSettings.typedMultipleDropdownSetting.map((name) => TypedItem.deserialize(name));
-    }
+    await this.runMigrations(record);
   }
 
-  protected override async onSavingRecord(record: Record<string, unknown>): Promise<void> {
+  protected override async onSavingRecord(record: SettingsRecord): Promise<void> {
+    this.setRecordVersion(record, this.getCurrentRecordVersion());
     await super.onSavingRecord(record);
-    const serializedSettings = record as Partial<SerializedSettings>;
-    const pluginSettings = record as Partial<PluginSettings>;
-
-    if (pluginSettings.typedDropdownSetting) {
-      serializedSettings.typedDropdownSetting = pluginSettings.typedDropdownSetting.name;
-    }
-
-    if (pluginSettings.typedMultipleDropdownSetting) {
-      serializedSettings.typedMultipleDropdownSetting = pluginSettings.typedMultipleDropdownSetting.map((item) => item.name);
-    }
   }
 
   protected override registerValidators(): void {
     super.registerValidators();
-    this.registerValidator('textSetting', (value): MaybeReturn<string> => {
-      if (value === 'foo') {
-        return 'Foo is not allowed';
+  }
+
+  private getCurrentRecordVersion(): string {
+    return this.plugin.manifest.version;
+  }
+
+  private getMigrationsToApply(startVersion: string): null | readonly Migration[] {
+    const migrations: Migration[] = [];
+    const visitedVersions = new Set<string>();
+    const targetVersion = this.getCurrentRecordVersion();
+    let version = startVersion;
+
+    while (version !== targetVersion) {
+      const currentVersion = version;
+      if (visitedVersions.has(version)) {
+        return null;
       }
-    });
+
+      visitedVersions.add(currentVersion);
+      const migration = MIGRATIONS.find((item) => item.fromVersion === currentVersion);
+
+      if (migration === undefined) {
+        return null;
+      }
+
+      migrations.push(migration);
+      version = migration.toVersion;
+    }
+
+    return migrations;
+  }
+
+  private getRecordVersion(record: SettingsRecord): string {
+    const version = record[RECORD_VERSION_KEY];
+    return typeof version === 'string' ? version : '0.0.0';
+  }
+
+  private async runMigrations(record: SettingsRecord): Promise<void> {
+    const version = this.getRecordVersion(record);
+    const migrations = this.getMigrationsToApply(version);
+    if (migrations === null) {
+      console.warn(`Unknown settings record version "${version}". Skipping migrations.`);
+      return;
+    }
+    for (const migration of migrations) {
+      await migration.migrate(record);
+    }
+
+    this.setRecordVersion(record, this.getCurrentRecordVersion());
+  }
+
+  private setRecordVersion(record: SettingsRecord, version: string): void {
+    record[RECORD_VERSION_KEY] = version;
   }
 }
