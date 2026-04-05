@@ -1,6 +1,8 @@
 import {
   ButtonComponent,
-  Notice
+  Notice,
+  ProgressBarComponent,
+  setTooltip
 } from 'obsidian';
 import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/Plugin/PluginSettingsTabBase';
 import { SettingEx } from 'obsidian-dev-utils/obsidian/SettingEx';
@@ -15,8 +17,10 @@ const SYNC_PROGRESS_SETTING_HIDDEN_CLASS = 'siftly-sync-progress-setting-hidden'
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   private siftlyStatsElement: HTMLElement | null = null;
-  private syncBookmarksProgressBar: { setValue: (value: number) => void } | null = null;
-  private syncPagesProgressBar: { setValue: (value: number) => void } | null = null;
+  private syncBookmarksProgressBar: null | ProgressBarComponent = null;
+  private syncBookmarksProgressHoverElement: HTMLElement | null = null;
+  private syncPagesProgressBar: null | ProgressBarComponent = null;
+  private syncPagesProgressHoverElement: HTMLElement | null = null;
   private syncProgressElement: HTMLElement | null = null;
   private validator: null | SiftlyValidator = null;
   private validatorResult: boolean | undefined = undefined;
@@ -138,6 +142,11 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         this.syncProgressElement = settingEx.settingEl;
         this.syncProgressElement.addClass(SYNC_PROGRESS_SETTING_HIDDEN_CLASS);
 
+        const hoverTargets = settingEx.controlEl.querySelectorAll('.setting-progress-bar');
+        this.syncPagesProgressHoverElement = hoverTargets.item(0) as HTMLElement;
+        this.syncBookmarksProgressHoverElement = hoverTargets.item(1) as HTMLElement;
+        this.updateSyncProgressTooltips(null);
+
         this.plugin.siftlySyncer.setProgressMonitor('setting-tab', (event) => {
           this.updateSyncProgressBarValues(event);
         });
@@ -190,5 +199,38 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         break;
       }
     }
+    this.updateSyncProgressTooltips(
+      event.kind === 'progress' ? event : null
+    );
+  }
+
+  private updateSyncProgressTooltips(
+    progress: Extract<SiftlySyncProgressEvent, { kind: 'progress' }> | null
+  ): void {
+    const pagesEl = this.syncPagesProgressHoverElement;
+    const bookmarksEl = this.syncBookmarksProgressHoverElement;
+    if (pagesEl === null || bookmarksEl === null) {
+      return;
+    }
+    if (progress !== null) {
+      const { syncedCount, syncedPage, totalBookmarks, totalPages } = progress;
+      const pagePct = totalPages > 0
+        ? Math.round((syncedPage / totalPages) * SYNC_PROGRESS_PERCENT_MAX)
+        : 0;
+      const bookmarkPct = totalBookmarks > 0
+        ? Math.round((syncedCount / totalBookmarks) * SYNC_PROGRESS_PERCENT_MAX)
+        : 0;
+      setTooltip(
+        pagesEl,
+        `Pages: ${String(syncedPage)} / ${String(totalPages)} (${String(pagePct)}%)`
+      );
+      setTooltip(
+        bookmarksEl,
+        `Bookmarks: ${String(syncedCount)} / ${String(totalBookmarks)} (${String(bookmarkPct)}%)`
+      );
+      return;
+    }
+    setTooltip(pagesEl, 'Pages: —');
+    setTooltip(bookmarksEl, 'Bookmarks: —');
   }
 }

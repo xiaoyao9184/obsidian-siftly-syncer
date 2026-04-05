@@ -362,10 +362,6 @@ export function buildSiftlyStatsApiUrl(baseUrl: string): string {
   return `${normalizeSiftlyBaseUrl(baseUrl)}/api/stats`;
 }
 
-export function formatSiftlySyncProgressLine(done: number, totalBookmarks: number): string {
-  return `Siftly: syncing: ${String(done)}/${String(totalBookmarks)} bookmarks`;
-}
-
 export function normalizeSiftlyBaseUrl(url: string): string {
   return url.trim().replace(/\/+$/, '');
 }

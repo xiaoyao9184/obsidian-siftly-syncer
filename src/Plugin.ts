@@ -12,10 +12,7 @@ import type { PluginTypes } from './PluginTypes.ts';
 
 import { PluginSettingsManager } from './PluginSettingsManager.ts';
 import { PluginSettingsTab } from './PluginSettingsTab.ts';
-import {
-  formatSiftlySyncProgressLine,
-  SiftlySyncer
-} from './utils/SiftlySyncer.ts';
+import { SiftlySyncer } from './utils/SiftlySyncer.ts';
 import {
   normalizeSiftlyBaseUrl,
   SiftlyValidator
@@ -109,8 +106,8 @@ export class Plugin extends PluginBase<PluginTypes> {
 
     this.statusBarItemEl = this.addStatusBarItem();
     this.statusBarItemEl.empty();
-    this.statusBarItemEl.setAttribute('aria-label', 'Siftly');
-    this.statusBarItemEl.setAttribute('title', 'Siftly');
+    this.statusBarItemEl.setAttribute('aria-label', 'Siftly - idle');
+    this.statusBarItemEl.setAttribute('data-tooltip-position', 'top');
     await this.refreshStatusBarIconBySiftlyStatus();
     this.siftlySyncer.setProgressMonitor('status-bar', (event) => {
       if (!this.statusBarItemEl) {
@@ -119,37 +116,37 @@ export class Plugin extends PluginBase<PluginTypes> {
       switch (event.kind) {
         case 'invalid':
           this.statusBarItemEl.removeClass('siftly-status-spinning');
-          this.statusBarItemEl.setAttribute('title', `Siftly - ${event.message}`);
+          this.statusBarItemEl.setAttribute('aria-label', `Siftly - ${event.message}`);
           break;
         case 'last': {
           this.statusBarItemEl.removeClass('siftly-status-spinning');
           const formatted = event.latestImportedAt.toLocaleString();
-          this.statusBarItemEl.setAttribute('title', `Siftly - last synced at ${formatted}`);
+          this.statusBarItemEl.setAttribute('aria-label', `Siftly - last synced at ${formatted}`);
           break;
         }
         case 'never':
           this.statusBarItemEl.removeClass('siftly-status-spinning');
-          this.statusBarItemEl.setAttribute('title', `Siftly - ${event.message || 'idle'}`);
+          this.statusBarItemEl.setAttribute('aria-label', `Siftly - ${event.message || 'idle'}`);
           break;
         case 'progress':
           this.statusBarItemEl.addClass('siftly-status-spinning');
           this.statusBarItemEl.setAttribute(
-            'title',
-            `Siftly - ${formatSiftlySyncProgressLine(event.syncedCount, event.totalBookmarks)}`
+            'aria-label',
+            `Siftly - syncing: ${String(event.syncedCount)}/${String(event.totalBookmarks)} bookmarks`
           );
           break;
         case 'success': {
           this.statusBarItemEl.removeClass('siftly-status-spinning');
           const formatted = event.latestImportedAt.toLocaleString();
           this.statusBarItemEl.setAttribute(
-            'title',
+            'aria-label',
             `Siftly - synced ${String(event.syncedCount)} bookmarks (last at ${formatted})`
           );
           break;
         }
         default:
           this.statusBarItemEl.removeClass('siftly-status-spinning');
-          this.statusBarItemEl.setAttribute('title', 'Siftly - idle');
+          this.statusBarItemEl.setAttribute('aria-label', 'Siftly - idle');
           break;
       }
     });
