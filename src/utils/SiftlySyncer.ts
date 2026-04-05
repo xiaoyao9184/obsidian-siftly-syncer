@@ -1,6 +1,7 @@
 import {
   App,
   normalizePath,
+  Notice,
   requestUrl,
   TFile
 } from 'obsidian';
@@ -35,6 +36,7 @@ export interface SiftlySyncResult {
 
 export class SiftlySyncer {
   private readonly app: App;
+  private isSyncing = false;
   private readonly progressMonitors = new Map<string, (event: SiftlySyncProgressEvent) => void>();
   private readonly settings: PluginSettings;
 
@@ -81,49 +83,60 @@ export class SiftlySyncer {
   }
 
   public async sync(syncIncremental: boolean = this.settings.syncIncremental): Promise<SiftlySyncResult> {
-    this.progress({ kind: 'never', message: 'Syncing: STARTED' });
+    if (this.isSyncing) {
+      // eslint-disable-next-line obsidianmd/ui/sentence-case -- "Siftly Sync" is the product name
+      new Notice('Siftly Sync is already in progress');
+      return { latestImportedAt: null, syncedCount: 0 };
+    }
 
-    let latestImportedAt: Date = new Date(0);
-    let latestImportedAtTimestamp = Number.NEGATIVE_INFINITY;
-    let syncedCount = 0;
-
+    this.isSyncing = true;
     try {
-      const totalBookmarksFromStats = await this.fetchTotalBookmarks();
-      const totalBookmarks = await this.resolveTotalBookmarksForSync(totalBookmarksFromStats, syncIncremental);
-      const pageSize = DEFAULT_PAGE_SIZE;
-      const totalPages = Math.ceil(totalBookmarks / pageSize);
+      this.progress({ kind: 'never', message: 'Syncing: STARTED' });
 
-      await this.ensureFolderExists(this.settings.syncFolder);
-      await this.ensureFolderExists(this.settings.syncAttachmentsFolder);
+      let latestImportedAt: Date = new Date(0);
+      let latestImportedAtTimestamp = Number.NEGATIVE_INFINITY;
+      let syncedCount = 0;
 
-      if (totalPages === 0) {
-        this.progress({ kind: 'progress', syncedCount, syncedPage: 0, totalBookmarks, totalPages });
-      }
-      for (let page = 1; page <= totalPages; page++) {
-        this.progress({ kind: 'progress', syncedCount, syncedPage: page, totalBookmarks, totalPages });
-        const pageData = await this.fetchBookmarksPage(page, pageSize);
-        for (const bookmark of pageData.bookmarks) {
-          const importedAtTimestamp = Date.parse(bookmark.importedAt);
-          if (Number.isFinite(importedAtTimestamp) && importedAtTimestamp > latestImportedAtTimestamp) {
-            latestImportedAtTimestamp = importedAtTimestamp;
-            latestImportedAt = new Date(importedAtTimestamp);
-          }
-          await this.writeBookmarkNote(bookmark);
-          syncedCount++;
-          this.progress({ kind: 'progress', syncedCount, syncedPage: page, totalBookmarks, totalPages });
+      try {
+        const totalBookmarksFromStats = await this.fetchTotalBookmarks();
+        const totalBookmarks = await this.resolveTotalBookmarksForSync(totalBookmarksFromStats, syncIncremental);
+        const pageSize = DEFAULT_PAGE_SIZE;
+        const totalPages = Math.ceil(totalBookmarks / pageSize);
+
+        await this.ensureFolderExists(this.settings.syncFolder);
+        await this.ensureFolderExists(this.settings.syncAttachmentsFolder);
+
+        if (totalPages === 0) {
+          this.progress({ kind: 'progress', syncedCount, syncedPage: 0, totalBookmarks, totalPages });
         }
-      }
+        for (let page = 1; page <= totalPages; page++) {
+          this.progress({ kind: 'progress', syncedCount, syncedPage: page, totalBookmarks, totalPages });
+          const pageData = await this.fetchBookmarksPage(page, pageSize);
+          for (const bookmark of pageData.bookmarks) {
+            const importedAtTimestamp = Date.parse(bookmark.importedAt);
+            if (Number.isFinite(importedAtTimestamp) && importedAtTimestamp > latestImportedAtTimestamp) {
+              latestImportedAtTimestamp = importedAtTimestamp;
+              latestImportedAt = new Date(importedAtTimestamp);
+            }
+            await this.writeBookmarkNote(bookmark);
+            syncedCount++;
+            this.progress({ kind: 'progress', syncedCount, syncedPage: page, totalBookmarks, totalPages });
+          }
+        }
 
-      this.progress({ kind: 'success', latestImportedAt, syncedCount });
-      return { latestImportedAt, syncedCount };
-    } catch (error) {
-      console.error('Siftly sync error:', error);
-      const message = `Failed to sync bookmarks from Siftly: ${String(error)}`;
-      this.progress({ kind: 'invalid', message });
-      return {
-        latestImportedAt: null,
-        syncedCount
-      };
+        this.progress({ kind: 'success', latestImportedAt, syncedCount });
+        return { latestImportedAt, syncedCount };
+      } catch (error) {
+        console.error('Siftly sync error:', error);
+        const message = `Failed to sync bookmarks from Siftly: ${String(error)}`;
+        this.progress({ kind: 'invalid', message });
+        return {
+          latestImportedAt: null,
+          syncedCount
+        };
+      }
+    } finally {
+      this.isSyncing = false;
     }
   }
 
