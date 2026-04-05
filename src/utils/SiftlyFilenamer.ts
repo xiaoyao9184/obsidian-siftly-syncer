@@ -30,10 +30,12 @@ function parseDate(isoDate: string): Date {
 
 function sanitizeTextSuffix(text: string): string {
   let sanitized = text
-    .replace(/[\\/:*?"<>|]/gu, '-')
-    .replace(/\s+/gu, '-')
-    .replace(/-+/gu, '-')
-    .replace(/^-|-$/gu, '');
+    .trim()
+    .replace(/^[.\s_~#@]+/u, '') // Remove dangerous prefixes
+    .replace(/[\\/:*?"<>|]/gu, '-') // Replace special characters with hyphens
+    .replace(/\s+/gu, '-') // Replace spaces with hyphens
+    .replace(/-+/gu, '-') // Replace multiple hyphens with a single hyphen
+    .replace(/^-|-$/gu, ''); // Remove leading and trailing hyphens
 
   const maxSuffixLength = MAX_NOTE_FILENAME_LENGTH
     - DAY_PART_LENGTH
