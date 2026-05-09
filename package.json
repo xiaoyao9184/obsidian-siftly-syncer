@@ -1,6 +1,6 @@
 {
   "name": "siftly-syncer",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Obsidian plugin to sync bookmarks from Siftly instance.",
   "keywords": [],
   "license": "MIT",

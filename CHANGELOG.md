@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.0.2
+
+- refactor: optimize bookmark syncing logic in SiftlySyncer to prevent unnecessary iterations
+- refactor: improve text sanitization in SiftlyFilenamer by adding prefix removal and trimming
+- refactor: enhance status bar accessibility and update sync progress tooltips in Plugin and PluginSettingsTab
+- refactor: implement sync locking mechanism in SiftlySyncer to prevent concurrent sync operations
+
 ## 0.0.1
 
 - chore: add minAppVersion field to manifest.json for compatibility
