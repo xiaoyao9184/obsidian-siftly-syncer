@@ -109,10 +109,13 @@ export class SiftlySyncer {
         if (totalPages === 0) {
           this.progress({ kind: 'progress', syncedCount, syncedPage: 0, totalBookmarks, totalPages });
         }
-        for (let page = 1; page <= totalPages; page++) {
+        for (let page = 1; page <= totalPages && syncedCount < totalBookmarks; page++) {
           this.progress({ kind: 'progress', syncedCount, syncedPage: page, totalBookmarks, totalPages });
           const pageData = await this.fetchBookmarksPage(page, pageSize);
           for (const bookmark of pageData.bookmarks) {
+            if (syncedCount >= totalBookmarks) {
+              break;
+            }
             const importedAtTimestamp = Date.parse(bookmark.importedAt);
             if (Number.isFinite(importedAtTimestamp) && importedAtTimestamp > latestImportedAtTimestamp) {
               latestImportedAtTimestamp = importedAtTimestamp;
